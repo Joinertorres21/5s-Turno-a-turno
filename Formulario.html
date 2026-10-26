@@ -1,0 +1,395 @@
+<!-- Librería XLSX con soporte de estilos y descargas en cliente -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- Modal de Carga de Auditorías 5S con Corrección de Territorios -->
+<div class="modal fade" id="modalSubida" tabindex="-1" aria-labelledby="modalSubidaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title" id="modalSubidaLabel">Cargar Nueva Auditoría 5S</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Paso 1: Selección de Archivo y Descarga de Plantilla -->
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <label class="form-label fw-bold mb-0">1. Selecciona el archivo semanal (.xlsx)</label>
+            <button type="button" class="btn btn-sm btn-outline-success fw-semibold" onclick="descargarPlantillaExcel()">
+              📥 Descargar Plantilla Oficial (.xlsx)
+            </button>
+          </div>
+          <input class="form-control" type="file" id="archivoExcel" accept=".xlsx, .xls">
+        </div>
+        
+        <div class="d-grid gap-2 mb-3">
+          <button class="btn btn-primary fw-semibold" id="btnLeerPrevia" onclick="leerArchivo()">Leer y Previsualizar</button>
+        </div>
+
+        <!-- Paso 2: Vista Previa y Corrección de Territorios -->
+        <div id="areaPrevia" style="display: none;">
+          <hr>
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <h6 class="fw-bold mb-0">2. Vista Previa y Corrección de Territorios</h6>
+            <span id="badgeConteoFilas" class="badge bg-secondary">0 registros</span>
+          </div>
+          <p class="text-muted small">El sistema autocompletó los territorios que coinciden. Por favor, selecciona el territorio correcto para los campos vacíos antes de guardar.</p>
+          
+          <div class="table-responsive border rounded" style="max-height: 420px;">
+            <table class="table table-sm table-hover table-bordered align-middle mb-0">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th style="min-width: 130px;">Semana</th>
+                  <th style="min-width: 110px;">Fecha</th>
+                  <th style="min-width: 220px;">Auditor</th>
+                  <th style="min-width: 180px;">Territorio en Excel</th>
+                  <th style="min-width: 240px;">Territorio Asignado (Modificable)</th>
+                </tr>
+              </thead>
+              <tbody id="tablaVistaPrevia">
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success fw-bold" id="btnGuardar" style="display: none;" onclick="guardarNuevosDatos()">Guardar en Base de Datos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Columnas Oficiales requeridas (Estructura limpia de 34 columnas) ──
+  const COLUMNAS_OFICIALES_49 = [
+    "Semana", "Fecha", "Turno", "Territorio", "Auditor", "Cumplimiento",
+    "¿Hay exceso de pertenencias personales (mochilas, etc.) en el área? ¿Hay exceso de EPP?",
+    "¿Se cuenta con layout del área?",
+    "¿Se cuenta con una RACI de actividades?",
+    "¿Se cuenta con una lista de verificación de actividades?",
+    "¿Las herramientas de limpieza necesarias están disponibles y son suficientes?",
+    "¿El área está libre de materiales, repuestos o documentos innecesarios?",
+    "¿Hay una forma sistemática/estandarizada de control de las herramientas?",
+    "¿Las herramientas de trabajo necesarias están disponibles y son suficientes?",
+    "¿Los lugares de almacenamiento están claramente marcados?",
+    "¿Los elementos se almacenan de una manera que hace que el área sea segura?",
+    "¿Los elementos están segregados / clasificados?",
+    "¿Las herramientas de trabajo están en el lugar adecuado?",
+    "¿Los archivos, carpetas, cajas, armarios están identificados y etiquetados?",
+    "¿Los suministros de limpieza se guardan en un lugar accesible?",
+    "¿Están limpios los interiores de los gabinetes, cajones, escritorios y equipos?",
+    "¿Hay suficientes recipientes con tapa para recolectar residuos?",
+    "¿Pisos limpios, sin daños, secos y sin riesgos de tropiezos?",
+    "¿Área libre de alguna deficiencia de mantenimiento que deba ser tratada?",
+    "¿Hay un mapa de 5S/Territorio para el área y éste tiene un dueño asignado?",
+    "¿Ha sido desarrollada, comunicada y publicada una RACI para 5S?",
+    "¿Los equipos, herramientas, documentos, muebles están en buen estado?",
+    "¿Existe un programa de limpieza en el área?",
+    "¿Las 5S son abordadas durante las reuniones de cambio de turno?",
+    "¿Hay un programa de auditoría y se cumple?",
+    "¿Corregiste los hallazgos encontrados durante tu última auditoría?",
+    "¿Se cumplen los programas de limpieza y checklist para mantener las 5S?",
+    "¿Se han compartido auditorías pasadas con los operadores en el área?",
+    "¿El promedio de las últimas 3 auditorías es igual o superior a 80%?"
+  ];
+
+  let nuevosDatos = [];
+  let listaTerritorios = [];
+
+  function normalizarTexto(txt) {
+    return String(txt || '')
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/^#+/, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  function cargarTerritoriosServidor() {
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(territorios => { 
+          if (Array.isArray(territorios) && territorios.length > 0) {
+            listaTerritorios = territorios;
+          }
+        })
+        .obtenerListaTerritorios();
+    }
+  }
+
+  // Pre-cargar territorios al cargar el DOM y al abrir el modal
+  document.addEventListener('DOMContentLoaded', cargarTerritoriosServidor);
+
+  var elModalSubida = document.getElementById('modalSubida');
+  if (elModalSubida) {
+    elModalSubida.addEventListener('show.bs.modal', function () {
+      if (listaTerritorios.length === 0) {
+        cargarTerritoriosServidor();
+      }
+    });
+  }
+
+  function abrirModalSubida() {
+    var modalEl = document.getElementById('modalSubida');
+    if (modalEl) {
+      var modalInst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+      modalInst.show();
+    }
+  }
+
+  // ── Generador y Descargador de Plantilla Oficial Excel (.xlsx) ──
+  function descargarPlantillaExcel() {
+    try {
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([COLUMNAS_OFICIALES_49]);
+
+      // Estilo institucional para la fila de encabezados
+      const headerStyle = {
+        font: { name: "Calibri", sz: 11, bold: true, color: { rgb: "000000" } },
+        fill: { fgColor: { rgb: "E0E0E0" } },
+        alignment: { wrapText: true, horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "B0B0B0" } },
+          bottom: { style: "thin", color: { rgb: "B0B0B0" } },
+          left: { style: "thin", color: { rgb: "B0B0B0" } },
+          right: { style: "thin", color: { rgb: "B0B0B0" } }
+        }
+      };
+
+      // Asignar anchos de columnas y estilos celda a celda
+      const colWidths = [];
+      for (let c = 0; c < COLUMNAS_OFICIALES_49.length; c++) {
+        const colTitle = COLUMNAS_OFICIALES_49[c];
+        colWidths.push({ wch: c < 17 ? Math.max(colTitle.length + 4, 18) : 34 });
+
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: c });
+        if (ws[cellRef]) {
+          ws[cellRef].s = headerStyle;
+        }
+      }
+      ws['!cols'] = colWidths;
+      ws['!rows'] = [{ hpt: 45 }];
+
+      // Inmovilizar la primera fila
+      ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+      ws['!views'] = [{ state: 'frozen', ySplit: 1, activeCell: 'A2' }];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Base");
+      XLSX.writeFile(wb, "Plantilla_Auditoria_5S.xlsx");
+
+      if (typeof mostrarToast === 'function') {
+        mostrarToast("Plantilla descargada exitosamente", "exito");
+      }
+    } catch (err) {
+      console.error("Error al generar plantilla:", err);
+      alert("Error al generar la plantilla: " + err.message);
+    }
+  }
+
+  // ── Lectura y Previsualización del archivo .xlsx cargado ─────────
+  function leerArchivo() {
+    const fileInput = document.getElementById('archivoExcel');
+    if (!fileInput.files || !fileInput.files[0]) {
+      return alert("Por favor selecciona un archivo Excel (.xlsx o .xls).");
+    }
+
+    document.getElementById('areaPrevia').style.display = 'none';
+    document.getElementById('btnGuardar').style.display = 'none';
+    document.getElementById('btnLeerPrevia').disabled = true;
+    document.getElementById('btnLeerPrevia').innerText = "Procesando archivo...";
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        
+        const nombreHoja = workbook.SheetNames.includes('Registros_5s') ? 'Registros_5s' : workbook.SheetNames[0];
+        const hoja = workbook.Sheets[nombreHoja];
+        const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: "" });
+        
+        if (filas.length <= 1) {
+          alert("El archivo está vacío o no contiene filas de datos.");
+          resetearBotonLeer();
+          return;
+        }
+        
+        // Descartar encabezado
+        filas.shift();
+        
+        nuevosDatos = filas.map(row => {
+          const esFormato34 = row.length <= 36;
+          let fecha = esFormato34 ? row[1] : row[20];
+          let fechaStr = fecha instanceof Date ? fecha.toLocaleDateString() : String(fecha || '');
+
+          // Sanitizar fechas para Apps Script
+          let filaSegura = row.map(celda => {
+            return celda instanceof Date ? celda.toISOString().split('T')[0] : celda;
+          });
+
+          let semana = String(row[0] || '').trim();
+          let turno = esFormato34 ? String(row[2] || '').trim() : '';
+          let territorioOriginal = esFormato34 ? String(row[3] || '').trim() : String(row[18] || '').trim();
+          let auditor = String(row[4] || '').trim();
+          let cumplimiento = esFormato34 ? String(row[5] || '').trim() : '';
+
+          return {
+            filaCompleta: filaSegura,
+            semana: semana,
+            fechaFormato: fechaStr,
+            turno: turno,
+            auditor: auditor,
+            territorioOriginal: territorioOriginal,
+            territorioAsignado: "",
+            cumplimiento: cumplimiento
+          };
+        }).filter(r => r.auditor !== "" || r.territorioOriginal !== "");
+
+        if (nuevosDatos.length === 0) {
+          alert("No se encontraron registros válidos de auditoría en el archivo.");
+          resetearBotonLeer();
+          return;
+        }
+
+        mostrarVistaPrevia(nuevosDatos);
+      } catch (err) {
+        console.error("Error al leer Excel:", err);
+        alert("Error al procesar el archivo Excel: " + err.message);
+      } finally {
+        resetearBotonLeer();
+      }
+    };
+
+    reader.onerror = function() {
+      alert("Error al leer el archivo del dispositivo.");
+      resetearBotonLeer();
+    };
+
+    reader.readAsArrayBuffer(fileInput.files[0]);
+  }
+
+  function resetearBotonLeer() {
+    const btn = document.getElementById('btnLeerPrevia');
+    btn.disabled = false;
+    btn.innerText = "Leer y Previsualizar";
+  }
+
+  // ── Render de Vista Previa y Detección de Territorios ───────────
+  function mostrarVistaPrevia(registros) {
+    const tbody = document.getElementById('tablaVistaPrevia');
+    tbody.innerHTML = '';
+
+    document.getElementById('badgeConteoFilas').textContent = registros.length + " auditorías detectadas";
+
+    let opcionesHTML = `<option value="">-- Selecciona un Territorio --</option>`;
+    listaTerritorios.forEach(t => { 
+      opcionesHTML += `<option value="${t}">${t}</option>`; 
+    });
+
+    registros.forEach((reg, index) => {
+      // Búsqueda inteligente: 1. No Aplica / 2. Exacta / 3. Case-insensitive / 4. Normalizada
+      const terrOrigNorm = normalizarTexto(reg.territorioOriginal);
+      let matchedTerr = null;
+      if (terrOrigNorm.includes('noaplica') || terrOrigNorm === 'na' || terrOrigNorm.includes('noaplica5s')) {
+        matchedTerr = listaTerritorios.find(t => t.toLowerCase() === 'no aplica') || 'No Aplica';
+      } else {
+        matchedTerr = listaTerritorios.find(t => t.trim().toLowerCase() === reg.territorioOriginal.toLowerCase())
+                   || listaTerritorios.find(t => normalizarTexto(t) === terrOrigNorm);
+      }
+      
+      const esInvalido = !matchedTerr;
+      let selectElement = `
+        <select class="form-select form-select-sm selector-territorio ${esInvalido ? 'is-invalid' : ''}" 
+                data-index="${index}" 
+                onchange="actualizarSeleccionTerritorio(this)">
+          ${opcionesHTML}
+        </select>
+      `;
+
+      if (matchedTerr) {
+        selectElement = selectElement.replace(`value="${matchedTerr}"`, `value="${matchedTerr}" selected`);
+        nuevosDatos[index].territorioAsignado = matchedTerr;
+      }
+
+      const esNoAplica = (matchedTerr === 'No Aplica');
+      const notaNoAplica = esNoAplica ? `<span class="badge bg-secondary ms-1" style="font-size:10px;">Excluido de informe</span>` : '';
+
+      const fila = `
+        <tr class="${esNoAplica ? 'table-light text-muted' : ''}">
+          <td><span class="badge bg-light text-dark border">${reg.semana || 'N/A'}</span></td>
+          <td class="small">${reg.fechaFormato || '-'}</td>
+          <td class="fw-semibold">${reg.auditor || 'Sin Auditor'}</td>
+          <td class="text-muted"><code style="font-size:12px;">${reg.territorioOriginal || '(vacío)'}</code> ${notaNoAplica}</td>
+          <td>${selectElement}</td>
+        </tr>
+      `;
+      tbody.insertAdjacentHTML('beforeend', fila);
+    });
+
+    document.getElementById('areaPrevia').style.display = 'block';
+    document.getElementById('btnGuardar').style.display = 'inline-block';
+  }
+
+  function actualizarSeleccionTerritorio(select) {
+    const idx = select.getAttribute('data-index');
+    const valor = select.value;
+    if (valor) {
+      select.classList.remove('is-invalid');
+      nuevosDatos[idx].territorioAsignado = valor;
+    } else {
+      select.classList.add('is-invalid');
+      nuevosDatos[idx].territorioAsignado = "";
+    }
+  }
+
+  // ── Guardado en Hoja de Google Sheets ───────────────────────────
+  function guardarNuevosDatos() {
+    const selectores = document.querySelectorAll('.selector-territorio');
+    let hayErrores = false;
+    let pendientes = 0;
+
+    selectores.forEach(select => {
+      const index = select.getAttribute('data-index');
+      const valor = select.value;
+      if (!valor) {
+        hayErrores = true;
+        pendientes++;
+        select.classList.add('is-invalid');
+      } else {
+        select.classList.remove('is-invalid');
+        nuevosDatos[index].territorioAsignado = valor;
+      }
+    });
+
+    if (hayErrores) {
+      return alert("Hay " + pendientes + " fila(s) sin territorio asignado (marcadas en rojo). Por favor, selecciona el territorio correspondiente antes de guardar.");
+    }
+
+    const btn = document.getElementById('btnGuardar');
+    btn.innerText = "Guardando " + nuevosDatos.length + " registros...";
+    btn.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(res => {
+        alert("✅ " + nuevosDatos.length + " auditorías guardadas exitosamente en la base de datos.");
+        // Cerrar modal
+        var modalEl = document.getElementById('modalSubida');
+        var modalInst = bootstrap.Modal.getInstance(modalEl);
+        if (modalInst) modalInst.hide();
+        // Recargar datos y dashboard
+        if (typeof iniciarDatos === 'function') {
+          google.script.run.withSuccessHandler(iniciarDatos).getDatosBase();
+        } else {
+          location.reload();
+        }
+      })
+      .withFailureHandler(e => {
+        alert("❌ Error al guardar datos: " + (e.message || e));
+        btn.innerText = "Guardar en Base de Datos";
+        btn.disabled = false;
+      })
+      .guardarDatosEnBase(nuevosDatos);
+  }
+</script>

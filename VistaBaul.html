@@ -1,0 +1,1834 @@
+<!-- VistaBaul.html — Baúl de Acciones 5S con listas sincronizadas de Baul_listas, edición de estado y reporte de retrasadas -->
+<style>
+  /* Responsive Móvil para el Baúl */
+  .tabla-baul-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tabla-baul-etos {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    background: #fff;
+    min-width: 580px;
+  }
+  .kpi-baul-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 768px) {
+    .barra-accion-baul {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 12px !important;
+    }
+    .barra-accion-baul-btns {
+      display: flex !important;
+      width: 100% !important;
+      flex-wrap: wrap !important;
+      gap: 6px !important;
+    }
+    .barra-accion-baul-btns .btn {
+      flex: 1 1 auto !important;
+      text-align: center !important;
+      justify-content: center !important;
+      font-size: 11.5px !important;
+      padding: 8px 10px !important;
+    }
+    .kpi-baul-grid {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 8px !important;
+    }
+    .kpi-baul-grid .kpi-card:last-child {
+      grid-column: span 2 !important;
+    }
+    .filtros-baul-grid {
+      grid-template-columns: 1fr 1fr !important;
+      gap: 8px !important;
+    }
+    .modal-5s-contenido {
+      width: 96% !important;
+      max-width: 96% !important;
+      margin: 8px auto !important;
+      max-height: 92vh !important;
+      padding-bottom: 14px !important;
+    }
+  }
+  @media (max-width: 480px) {
+    .filtros-baul-grid {
+      grid-template-columns: 1fr !important;
+      gap: 8px !important;
+    }
+    .kpi-baul-grid .kpi-card {
+      padding: 10px !important;
+    }
+    .kpi-baul-grid .valor {
+      font-size: 22px !important;
+    }
+  }
+
+  .badge-pendiente { background: #e0f2fe !important; color: #0284c7 !important; border: 1px solid #bae6fd !important; }
+  .tabla-baul-etos { width: 100%; border-collapse: collapse; font-size: 12px; background: #fff; table-layout: fixed; }
+  .tabla-baul-etos th { background: #f8fafc; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: .4px; padding: 10px 8px; border-bottom: 2px solid #e2e8f0; text-align: left; }
+  .tabla-baul-etos td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
+  .tabla-baul-etos tr:hover { background: #f8fafc; }
+  .pill-estado { display: inline-block; padding: 3px 8px; border-radius: 9999px; font-size: 10px; font-weight: 800; letter-spacing: .3px; text-align: center; white-space: nowrap; }
+  .pill-cerrada { background: #475569; color: #ffffff; }
+  .pill-retrasada { background: #ef4444; color: #ffffff; }
+  .pill-progreso { background: #f59e0b; color: #ffffff; }
+  .pill-pendiente { background: #0284c7; color: #ffffff; }
+</style>
+<div id="vista-baul" class="vista">
+  <div class="contenedor aud-contenedor-mobile">
+
+    <!-- Subvista 1: Lista del Baúl -->
+    <div id="baul-lista">
+      <div class="barra-accion barra-accion-baul" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button class="btn btn-ghost btn-sm" onclick="cambiarVista('dashboard')" style="font-weight:700; color:#2563eb; display:inline-flex; align-items:center; gap:4px; padding:6px 12px; border-radius:8px; border:1px solid #bfdbfe; background:#eff6ff;">
+            ← Volver
+          </button>
+          <div>
+            <h2 style="font-size:18px; font-weight:800; margin:0; display:flex; align-items:center; gap:8px;">
+              <span>📦</span> Baúl de Acciones
+            </h2>
+            <span style="font-size:11.5px; color:var(--texto-muted);">Gestión Logística</span>
+          </div>
+        </div>
+        <div class="barra-accion-baul-btns" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <button class="btn btn-azul btn-sm" onclick="cambiarVista('kpi-baul')" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+            <span>📊</span> <span>Dashboard Baúl</span>
+          </button>
+          <button class="btn btn-rojo btn-sm" onclick="abrirModalReporteRetrasadas()" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+            <span>🚨</span> <span>Reporte Retrasadas</span>
+          </button>
+          <button class="btn btn-sm" onclick="abrirBaulAgregar()" style="display:inline-flex; align-items:center; gap:6px; font-weight:800; background:#f97316; color:#fff; border:none; border-radius:8px; padding:7px 14px; cursor:pointer;">
+            <span>+</span> <span>Nueva Acción</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPIs del Baúl (Estilo Tarjetas ETOS) -->
+      <div class="kpi-grid kpi-baul-grid">
+        <div class="kpi-card" style="padding:12px; text-align:center; border:1px solid #fed7aa; border-radius:12px; background:#fff; cursor:pointer;" onclick="filtrarEstadoDirectoBaul('EN PROGRESO')" title="Ver En Progreso">
+          <div class="valor" id="baul-kpi-progreso" style="color:#f59e0b; font-size:26px; font-weight:900;">0</div>
+          <div class="etiqueta" style="font-size:10.5px; font-weight:800; color:#b45309; letter-spacing:.4px; text-transform:uppercase;">EN PROGRESO</div>
+        </div>
+        <div class="kpi-card" style="padding:12px; text-align:center; border:1px solid #bae6fd; border-radius:12px; background:#f0f9ff; cursor:pointer;" onclick="filtrarEstadoDirectoBaul('PENDIENTE CIERRE')" title="Ver Pendientes de Cierre">
+          <div class="valor" id="baul-kpi-pendientes" style="color:#0284c7; font-size:26px; font-weight:900;">0</div>
+          <div class="etiqueta" style="font-size:10.5px; font-weight:800; color:#0369a1; letter-spacing:.4px; text-transform:uppercase;">PENDIENTE CIERRE</div>
+        </div>
+        <div class="kpi-card" style="padding:12px; text-align:center; border:1px solid #fecaca; border-radius:12px; background:#fff; cursor:pointer;" onclick="filtrarEstadoDirectoBaul('RETRASADAS')" title="Ver Retrasadas">
+          <div class="valor" id="baul-kpi-retrasadas" style="color:#ef4444; font-size:26px; font-weight:900;">0</div>
+          <div class="etiqueta" style="font-size:10.5px; font-weight:800; color:#ef4444; letter-spacing:.4px; text-transform:uppercase;">RETRASADAS</div>
+        </div>
+        <div class="kpi-card" style="padding:12px; text-align:center; border:1px solid #cbd5e1; border-radius:12px; background:#fff; cursor:pointer;" onclick="filtrarEstadoDirectoBaul('CERRADAS')" title="Ver Cerradas">
+          <div class="valor" id="baul-kpi-cerradas" style="color:#475569; font-size:26px; font-weight:900;">0</div>
+          <div class="etiqueta" style="font-size:10.5px; font-weight:800; color:#475569; letter-spacing:.4px; text-transform:uppercase;">CERRADAS</div>
+        </div>
+        <div class="kpi-card" style="padding:12px; text-align:center; border:1px solid #a7f3d0; border-radius:12px; background:#fff; cursor:pointer;" onclick="filtrarEstadoDirectoBaul('')" title="Ver Todas las Acciones">
+          <div class="valor" id="baul-kpi-total" style="color:#10b981; font-size:26px; font-weight:900;">0</div>
+          <div class="etiqueta" style="font-size:10.5px; font-weight:800; color:#10b981; letter-spacing:.4px; text-transform:uppercase;">TOTAL</div>
+        </div>
+      </div>
+
+      <!-- Filtros del Baúl Estilo ETOS -->
+      <div class="card-5s" style="padding:14px; margin-bottom:16px; border-radius:12px; border:1px solid #e2e8f0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <div style="font-size:12px; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:6px;">
+            <span>🔍</span> Filtros y Rangos de Fecha
+          </div>
+          <!-- Botones de Fecha Automática -->
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-ghost" onclick="filtrarDiaHabilBaul()" style="font-size:11.5px; font-weight:700; border:1px solid #bae6fd; background:#f0f9ff; color:#0369a1; padding:4px 10px; border-radius:6px; cursor:pointer;" title="Filtrar automáticamente por el último día hábil">
+              ⚡ Día Hábil
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="filtrarEstaSemanaBaul()" style="font-size:11.5px; font-weight:700; border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:4px 10px; border-radius:6px; cursor:pointer;">
+              📅 Esta Semana
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="filtrarEsteMesBaul()" style="font-size:11.5px; font-weight:700; border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:4px 10px; border-radius:6px; cursor:pointer;">
+              📅 Este Mes
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="limpiarFiltrosBaul()" style="font-size:11.5px; font-weight:700; border:1px solid #e2e8f0; background:#fff; color:#64748b; padding:4px 10px; border-radius:6px; cursor:pointer;">
+              🔄 Todos
+            </button>
+          </div>
+        </div>
+
+        <div class="filtros-baul-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:flex-end;">
+          <div class="filtro-grupo">
+            <label style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; display:block;">Rutina</label>
+            <select id="f-baul-rutina" class="form-control-5s" onchange="renderTablaBaul()" style="border-radius:8px;">
+              <option value="">Todas las Rutinas</option>
+              <option value="5S" selected>5S</option>
+            </select>
+          </div>
+          <div class="filtro-grupo">
+            <label style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; display:block;">Territorio</label>
+            <select id="f-baul-territorio" class="form-control-5s" onchange="renderTablaBaul()" style="border-radius:8px;">
+              <option value="">Todos los Territorios</option>
+            </select>
+          </div>
+          <div class="filtro-grupo">
+            <label style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; display:block;">Estado</label>
+            <select id="f-baul-estado" class="form-control-5s" onchange="renderTablaBaul()" style="border-radius:8px;">
+              <option value="">Todos los Estados</option>
+              <option value="EN PROGRESO">EN PROGRESO</option>
+              <option value="PENDIENTE CIERRE">PENDIENTE CIERRE</option>
+              <option value="RETRASADAS">RETRASADAS</option>
+              <option value="CERRADAS">CERRADAS</option>
+            </select>
+          </div>
+          <div class="filtro-grupo">
+            <label style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; display:block;">Creado Desde</label>
+            <input type="date" id="f-baul-fecha-desde" class="form-control-5s" onchange="renderTablaBaul()" style="border-radius:8px;">
+          </div>
+          <div class="filtro-grupo">
+            <label style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; display:block;">Creado Hasta</label>
+            <input type="date" id="f-baul-fecha-hasta" class="form-control-5s" onchange="renderTablaBaul()" style="border-radius:8px;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Contenedor de Acciones (Tabla Estilo ETOS) -->
+      <div class="card-5s" style="padding:0; overflow:hidden; border-radius:12px; border:1px solid #e2e8f0;">
+        <div id="contenedor-tabla-baul">
+          <div class="cargando"><div class="spinner"></div><br>Cargando acciones...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Subvista 2: Agregar Acción Manual -->
+    <div id="baul-agregar" style="display:none;">
+      <div class="barra-accion" style="margin-bottom:16px;">
+        <button class="btn btn-ghost btn-sm" onclick="abrirBaulLista()">← Volver al Baúl</button>
+        <h2 style="font-size:18px; font-weight:800; margin:10px 0 0 0;">Nueva Acción 5S</h2>
+      </div>
+      <div class="card-5s">
+        <div class="card-header" style="padding:14px 16px;">
+          <h3 style="font-size:15px; margin:0;">Registrar Compromiso</h3>
+          <span class="muted" style="font-size:12px;">Listas sincronizadas con Baul_listas</span>
+        </div>
+        <div class="card-body" style="padding:16px;">
+          <form class="form-5s" id="form-add-baul" onsubmit="guardarNuevaAccionBaul(event)">
+            <div class="form-grid-mobile">
+              
+              <!-- Territorio -->
+              <div class="form-group">
+                <label style="font-size:12.5px; font-weight:700;">Territorio *</label>
+                <select id="add-baul-territorio" class="form-control-5s" required onchange="onTerritorioBaulAddCambia()">
+                  <option value="">Seleccione Territorio...</option>
+                </select>
+              </div>
+
+              <!-- Rutina -->
+              <div class="form-group">
+                <label style="font-size:12.5px; font-weight:700;">Rutina *</label>
+                <select id="add-baul-rutina" class="form-control-5s" required>
+                  <option value="">Seleccione Rutina...</option>
+                </select>
+              </div>
+
+              <!-- KPI -->
+              <div class="form-group">
+                <label style="font-size:12.5px; font-weight:700;">KPI *</label>
+                <select id="add-baul-kpi" class="form-control-5s" required>
+                  <option value="">Seleccione KPI...</option>
+                </select>
+              </div>
+
+              <!-- Responsable -->
+              <div class="form-group">
+                <label style="font-size:12.5px; font-weight:700;">Responsable *</label>
+                <input list="lista-add-baul-responsable" id="add-baul-responsable" class="form-control-5s" placeholder="Escriba o seleccione Responsable..." required>
+                <datalist id="lista-add-baul-responsable"></datalist>
+              </div>
+
+              <!-- Dueño -->
+              <div class="form-group">
+                <label style="font-size:12.5px; font-weight:700;">Dueño *</label>
+                <select id="add-baul-dueno" class="form-control-5s" required>
+                  <option value="">Seleccione Dueño...</option>
+                </select>
+              </div>
+
+              <!-- Fecha Compromiso -->
+              <div class="form-group">
+                <label style="font-size:12.5px; font-weight:700;">Fecha de Compromiso *</label>
+                <input type="date" id="add-baul-fecha-comp" class="form-control-5s" required>
+              </div>
+
+            </div>
+
+            <!-- Descripción del Hallazgo -->
+            <div class="form-group" style="margin-top:12px;">
+              <label style="font-size:12.5px; font-weight:700;">Descripción del Hallazgo *</label>
+              <textarea id="add-baul-descripcion" rows="2" class="form-control-5s" placeholder="Describe detalladamente el hallazgo o novedad encontrada..." required></textarea>
+            </div>
+
+            <!-- Acción Requerida -->
+            <div class="form-group" style="margin-top:10px;">
+              <label style="font-size:12.5px; font-weight:700;">Acción Requerida / Propuesta *</label>
+              <textarea id="add-baul-accion" rows="2" class="form-control-5s" placeholder="Describe la acción correctiva que se debe realizar..." required></textarea>
+            </div>
+
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+              <button type="button" class="btn btn-ghost" onclick="abrirBaulLista()">Cancelar</button>
+              <button type="submit" class="btn btn-naranja" id="btn-guardar-nueva-baul">💾 Registrar Acción</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Editar / Cerrar Acción en cualquier momento (Estilo ETO) -->
+    <div id="modal-editar-baul" class="modal-5s" style="display:none;">
+      <div class="modal-5s-backdrop" onclick="cerrarModalEditarBaul()"></div>
+      <div class="modal-5s-contenido">
+        <div style="background:var(--azul-dark); color:#fff; padding:14px 18px; border-radius:12px 12px 0 0; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h3 style="margin:0; font-size:16px; font-weight:800; color:#fff;">⚙️ Gestionar Acción 5S</h3>
+            <span id="modal-edit-subtitulo" style="font-size:11.5px; opacity:.8;">Acción del Baúl</span>
+          </div>
+          <button type="button" onclick="cerrarModalEditarBaul()" style="background:none; border:none; color:#fff; font-size:18px; cursor:pointer;">✕</button>
+        </div>
+        
+        <div style="padding:16px;">
+          <!-- Alerta de Acción Cerrada y Protegida -->
+          <div id="modal-edit-bloqueado-alerta" style="display:none; background:#ecfdf5; border:1px solid #10b981; color:#065f46; padding:10px 14px; border-radius:8px; font-size:12.5px; font-weight:700; margin-bottom:12px; align-items:center; gap:8px;">
+            <span style="font-size:18px;">🔒</span>
+            <div>
+              <div>Acción CERRADA y Protegida</div>
+              <div style="font-size:11px; font-weight:500; opacity:0.9;">Esta acción ya fue finalizada y validada. No se permiten más modificaciones.</div>
+            </div>
+          </div>
+
+          <form id="form-modal-edit-baul" onsubmit="guardarEdicionDesdeModal(event)">
+            <input type="hidden" id="modal-edit-index">
+
+            <div class="form-grid-mobile">
+              
+              <!-- Territorio -->
+              <div class="form-group">
+                <label style="font-size:12px; font-weight:700;">Territorio</label>
+                <select id="modal-edit-territorio" class="form-control-5s"></select>
+              </div>
+
+              <!-- Rutina -->
+              <div class="form-group">
+                <label style="font-size:12px; font-weight:700;">Rutina</label>
+                <select id="modal-edit-rutina" class="form-control-5s"></select>
+              </div>
+
+              <!-- KPI -->
+              <div class="form-group">
+                <label style="font-size:12px; font-weight:700;">KPI</label>
+                <select id="modal-edit-kpi" class="form-control-5s"></select>
+              </div>
+
+              <!-- Responsable -->
+              <div class="form-group">
+                <label style="font-size:12px; font-weight:700;">Responsable</label>
+                <input list="lista-modal-edit-responsable" id="modal-edit-responsable" class="form-control-5s" placeholder="Escriba o seleccione...">
+                <datalist id="lista-modal-edit-responsable"></datalist>
+              </div>
+
+              <!-- Dueño -->
+              <div class="form-group">
+                <label style="font-size:12px; font-weight:700;">Dueño</label>
+                <select id="modal-edit-dueno" class="form-control-5s"></select>
+              </div>
+
+              <!-- Fechas: Inicio y Compromiso -->
+              <div class="form-group">
+                <label style="font-size:12px; font-weight:700;">Fecha Inicio (Creación)</label>
+                <input type="text" id="modal-edit-fecha-inicio" class="form-control-5s" readonly style="background:#f1f5f9; color:#64748b;" placeholder="Fecha creación...">
+              </div>
+
+              <div class="form-group">
+                <label style="font-size:12px; font-weight:700;">Fecha Compromiso (Vence)</label>
+                <input type="date" id="modal-edit-fecha-comp" class="form-control-5s">
+              </div>
+
+              
+
+            </div>
+
+            <!-- Descripción Original -->
+            <div class="form-group" style="margin-top:10px;">
+              <label style="font-size:12px; font-weight:700;">Descripción del Hallazgo</label>
+              <div id="modal-edit-desc" style="padding:10px; background:var(--gris-bg); border-radius:8px; font-size:12.5px; border:1px solid var(--gris-borde); max-height:80px; overflow-y:auto;"></div>
+            </div>
+
+            <!-- Nota o Comentario de Gestión / Solución -->
+            <div class="form-group" style="margin-top:10px;">
+              <label style="font-size:12px; font-weight:700; color:#0f172a; margin-bottom:4px; display:block;">
+                📝 Nota / Comentario de la Gestión <span style="color:#ef4444;">*</span>
+              </label>
+              <textarea id="modal-edit-accion-realizada" rows="3" class="form-control-5s" placeholder="Describe la solución o gestión realizada en terreno..." required style="border-radius:8px; border:1px solid #cbd5e1;"></textarea>
+            </div>
+
+            <!-- Evidencia de Gestión (Foto Obligatoria) -->
+            <div class="form-group" style="margin-top:12px;">
+              <input type="hidden" id="modal-edit-evidencia">
+
+              <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+                <input type="file" id="modal-file-camara" accept="image/*" capture="environment" style="display:none;" onchange="procesarFotoCamara(this)">
+                <button type="button" id="btn-tomar-foto-modal" class="btn btn-outline-primary btn-sm" onclick="document.getElementById('modal-file-camara').click()" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; border-radius:6px; padding:7px 14px; font-size:12.5px;">
+                  📷 Tomar Foto <span style="font-weight:700; font-size:11.5px; color:#ef4444;">(obligatorio para cerrar)</span>
+                </button>
+                <span id="modal-foto-status" style="font-size:11.5px; color:var(--texto-muted);"></span>
+              </div>
+
+              <!-- Vista previa de la evidencia -->
+              <div id="modal-evidencia-contenedor">
+                <div id="modal-evidencia-vacia" style="padding:12px; background:#fff1f2; border:1px dashed #fda4af; border-radius:8px; color:#be123c; font-size:12px; font-weight:700; text-align:center;">
+                  ⚠️ Sin foto de evidencia cargada. Es OBLIGATORIA para poder cerrar la acción.
+                </div>
+                <div id="modal-evidencia-preview-box" style="display:none; text-align:center; background:#0f172a; border-radius:8px; padding:6px; overflow:hidden;">
+                  <img id="modal-evidencia-img" src="" alt="Evidencia de Ejecución" style="max-height:220px; width:auto; max-width:100%; object-fit:contain; border-radius:6px; display:inline-block;">
+                </div>
+              </div>
+            </div>
+<div style="display:flex; gap:10px; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap;">
+              <div>
+                <button type="button" class="btn btn-ghost" id="btn-modal-eliminar" onclick="eliminarAccionBaulConfirmado()" style="color:#ef4444; border:1px solid #fca5a5; background:#fef2f2; display:none;">
+                  🗑️ Eliminar
+                </button>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button type="button" class="btn btn-ghost" onclick="cerrarModalEditarBaul()">Cancelar</button>
+                <button type="submit" class="btn btn-azul" id="btn-modal-guardar-edit" style="font-weight:800; padding:9px 20px; border-radius:8px; cursor:pointer; color:#fff; border:none;">
+                  📤 Guardar Gestión
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+        <!-- Modal: Ver Detalle de Acción (Solo Lectura) -->
+    <div id="modal-ver-detalle" class="modal-5s" style="display:none;">
+      <div class="modal-5s-backdrop" onclick="cerrarModalVerDetalle()"></div>
+      <div class="modal-5s-contenido" style="max-width:580px;">
+        <div style="background:#475569; color:#fff; padding:14px 18px; border-radius:12px 12px 0 0; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h3 id="ver-modal-titulo" style="margin:0; font-size:16px; font-weight:800; color:#fff;">Detalle de la Gestión</h3>
+            <span id="ver-modal-subtitulo" style="font-size:11.5px; opacity:.9;">Vista de solo lectura</span>
+          </div>
+          <button type="button" onclick="cerrarModalVerDetalle()" style="background:none; border:none; color:#fff; font-size:18px; cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:18px; max-height:78vh; overflow-y:auto;">
+          <!-- Territorio & Rutina -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #e2e8f0;">
+            <div>
+              <span id="ver-modal-rutina" style="font-weight:800; color:#2563eb; font-size:14px;"></span>
+              <span id="ver-modal-territorio" style="font-size:12px; color:#64748b; margin-left:6px;"></span>
+            </div>
+            <span id="ver-modal-estado-pill" class="pill-estado"></span>
+          </div>
+
+          <!-- Hallazgo -->
+          <div style="margin-bottom:12px;">
+            <label style="font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; display:block; margin-bottom:4px;">Hallazgo Original:</label>
+            <div id="ver-modal-hallazgo" style="padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:12.5px; color:#1e293b; line-height:1.4;"></div>
+          </div>
+
+          <!-- Gestión realizada -->
+          <div style="margin-bottom:14px;">
+            <label style="font-size:11.5px; font-weight:800; color:#15803d; text-transform:uppercase; display:block; margin-bottom:4px;">🛠️ Gestión Realizada / Solución:</label>
+            <div id="ver-modal-gestion" style="padding:10px 12px; background:#f0fdf4; border:1px solid #bbf7d0; border-left:4px solid #16a34a; border-radius:8px; font-size:12.5px; color:#14532d; line-height:1.4;"></div>
+          </div>
+
+          <!-- Evidencia Fotográfica (Aquí sí se carga la imagen) -->
+          <div id="ver-modal-seccion-foto" style="margin-bottom:14px; display:none;">
+            <label style="font-size:11.5px; font-weight:800; color:#0369a1; text-transform:uppercase; display:block; margin-bottom:4px;">📸 Foto de Evidencia:</label>
+            <div style="text-align:center; background:#0f172a; border-radius:8px; padding:8px; overflow:hidden;">
+              <a id="ver-modal-foto-link" href="#" target="_blank" title="Clic para ver en tamaño completo">
+                <img id="ver-modal-foto-img" alt="Evidencia" style="max-height:280px; width:auto; max-width:100%; object-fit:contain; border-radius:6px; display:inline-block;">
+              </a>
+            </div>
+            <div style="text-align:center; font-size:11px; color:#64748b; margin-top:4px;">(Clic en la foto para abrirla en tamaño completo)</div>
+          </div>
+          <div id="ver-modal-sin-foto" style="display:none; padding:10px; background:#fff1f2; border:1px dashed #fda4af; border-radius:8px; color:#be123c; font-size:12px; text-align:center; margin-bottom:12px;">
+            ⚠️ Esta acción no cuenta con foto de evidencia adjunta.
+          </div>
+
+          <!-- Responsable y Fechas -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:10px 12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; font-size:11.5px; color:#475569; margin-bottom:14px;">
+            <div>👤 <strong>Responsable:</strong> <span id="ver-modal-responsable"></span></div>
+            <div>📅 <strong>Compromiso:</strong> <span id="ver-modal-vence"></span></div>
+          </div>
+
+          <!-- Botones: Volver y Modificar Gestión si la acción no está cerrada -->
+          <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #e2e8f0; padding-top:12px; gap:8px;">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="ver-modal-btn-modificar" onclick="modificarDesdeDetalle()" style="padding:7px 14px; font-weight:700; border-radius:6px; display:none; border:1px solid #2563eb; color:#2563eb;">
+              ✏️ Modificar Gestión
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalVerDetalle()" style="padding:8px 18px; font-weight:700; margin-left:auto;">Volver</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Reporte de Acciones Retrasadas -->
+    <div id="modal-reporte-retrasadas" class="modal-5s" style="display:none;">
+      <div class="modal-5s-backdrop" onclick="cerrarModalReporteRetrasadas()"></div>
+      <div class="modal-5s-contenido" style="max-width:650px;">
+        <div style="background:#ef4444; color:#fff; padding:14px 18px; border-radius:12px 12px 0 0; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h3 style="margin:0; font-size:16px; font-weight:800; color:#fff; display:flex; align-items:center; gap:6px;">
+              <span>🚨</span> Reporte de Acciones Retrasadas
+            </h3>
+            <span style="font-size:11.5px; opacity:.9;">Resumen para entrega y rendición de cuentas</span>
+          </div>
+          <button type="button" onclick="cerrarModalReporteRetrasadas()" style="background:none; border:none; color:#fff; font-size:18px; cursor:pointer;">✕</button>
+        </div>
+
+        <div style="padding:16px;">
+          <div id="reporte-retrasadas-metricas" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+            <div style="background:#fef2f2; padding:10px; border-radius:8px; border:1px solid #fee2e2; text-align:center;">
+              <div style="font-size:24px; font-weight:900; color:#ef4444;" id="rep-total-num">0</div>
+              <div style="font-size:11px; font-weight:700; color:#991b1b;">TOTAL RETRASADAS</div>
+            </div>
+            <div style="background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; text-align:center;">
+              <div style="font-size:24px; font-weight:900; color:var(--texto);" id="rep-territorios-num">0</div>
+              <div style="font-size:11px; font-weight:700; color:var(--texto-muted);">TERRITORIOS AFECTADOS</div>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:12px; font-weight:700; margin-bottom:4px; display:block;">Texto para entrega de turno / WhatsApp:</label>
+            <textarea id="texto-reporte-retrasadas" rows="8" class="form-control-5s" readonly style="font-family:monospace; font-size:11.5px; background:var(--gris-bg);"></textarea>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="copiarReporteRetrasadas()">
+              📋 Copiar Reporte
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalReporteRetrasadas()">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Validar y Cerrar Acción -->
+    <div id="modal-validar-cerrar" class="modal-5s" style="display:none;">
+      <div class="modal-5s-backdrop" onclick="cerrarModalRevisionYCierre()"></div>
+      <div class="modal-5s-contenido" style="max-width:560px;">
+        <div style="background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:#fff; padding:14px 18px; border-radius:12px 12px 0 0; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h3 style="margin:0; font-size:16px; font-weight:800; color:#fff; display:flex; align-items:center; gap:6px;">
+              <span>✅</span> Validar Cierre de Acción
+            </h3>
+            <span style="font-size:11.5px; opacity:.95;">Revisa el resumen de la gestión y la evidencia antes de cerrar</span>
+          </div>
+          <button type="button" onclick="cerrarModalRevisionYCierre()" style="background:none; border:none; color:#fff; font-size:18px; cursor:pointer;">✕</button>
+        </div>
+
+        <div style="padding:16px; max-height:80vh; overflow-y:auto;">
+          <input type="hidden" id="modal-cierre-index">
+
+          <!-- Ficha de la Acción -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:12px;">
+            <div style="font-size:11.5px; font-weight:800; color:#2563eb; margin-bottom:4px;" id="cierre-meta-header">
+              Territorio | Responsable
+            </div>
+            <div style="font-size:13px; font-weight:700; color:#1e293b; margin-bottom:8px; line-height:1.4;" id="cierre-desc-hallazgo">
+              Descripción del hallazgo...
+            </div>
+            
+            <div style="font-size:12.5px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px; color:#14532d; margin-bottom:12px;">
+              <strong style="color:#166534; font-size:12px; text-transform:uppercase; display:block; margin-bottom:4px;">📝 Resumen de la Gestión / Solución:</strong>
+              <div id="cierre-accion-realizada" style="font-weight:600; color:#14532d; font-size:13px; line-height:1.45;">Sin comentario registrado</div>
+            </div>
+
+            <!-- FOTO DE EVIDENCIA VISIBLE EN GRANDE -->
+            <div id="cierre-evidencia-seccion" style="display:none; margin-top:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="font-size:12px; font-weight:800; color:#0f172a; margin:0;">
+                  📷 Foto de Evidencia Adjunta:
+                </label>
+                <a id="cierre-evidencia-link-externo" href="#" target="_blank" style="font-size:11.5px; color:#2563eb; font-weight:700; text-decoration:underline; display:none;">
+                  ↗️ Abrir en Drive
+                </a>
+              </div>
+              <div id="cierre-evidencia-box" style="text-align:center; background:#0f172a; border-radius:8px; padding:6px; min-height:80px; display:flex; align-items:center; justify-content:center; overflow:hidden;"></div>
+              <div style="text-align:center; font-size:11px; color:#64748b; margin-top:4px;">(Haz clic en la foto para verla en tamaño original)</div>
+            </div>
+
+            <!-- Alerta si falta foto para cerrar -->
+            <div id="cierre-sin-evidencia-alerta" style="display:none; margin-top:8px; padding:10px 12px; background:#fff1f2; border:1px solid #fda4af; border-radius:8px; color:#be123c; font-size:12px; font-weight:700; text-align:center;">
+              ⚠️ Esta acción NO cuenta con foto de evidencia adjunta. No se puede autorizar el cierre sin evidencia.
+            </div>
+          </div>
+
+          <!-- Comentario Opcional de Cierre -->
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:12px; font-weight:700;">Comentario de Conformidad (Opcional)</label>
+            <input type="text" id="cierre-nota-opcional" class="form-control-5s" placeholder="Ej: Verificado en terreno, conforme.">
+          </div>
+
+          <!-- Identificación de quien valida -->
+          <div id="cierre-box-sesion-activa" style="font-size:12px; color:#047857; font-weight:700; margin-bottom:12px; padding:8px 12px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; display:flex; align-items:center; justify-content:space-between;">
+            <span>👤 Autorizando cierre como: <strong id="cierre-nombre-sesion">admin</strong></span>
+            <span style="font-size:11px; background:#10b981; color:#fff; padding:2px 8px; border-radius:12px; font-weight:800;">Autorizado</span>
+          </div>
+          <div id="cierre-box-sin-sesion" style="display:none; font-size:12px; color:#991b1b; font-weight:700; margin-bottom:12px; padding:8px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; display:flex; align-items:center; justify-content:space-between;">
+            <span>🔒 Debes identificarte con un usuario para autorizar el cierre.</span>
+            <button type="button" class="btn btn-sm btn-azul" onclick="abrirModalLogin(function(){ var f = document.getElementById('modal-cierre-index').value; abrirModalRevisionYCierre(f); })" style="padding:4px 10px; font-size:11px;">Identificarme</button>
+          </div>
+          <input type="hidden" id="cierre-user-id-input" value="admin">
+
+          <!-- Botones de Acción -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; border-top:1px solid #e2e8f0; padding-top:12px;">
+            <div>
+              <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmarCierreAccion('EN PROGRESO')" id="btn-cierre-devolver" style="border:1px solid #ef4444; color:#ef4444; font-weight:700; padding:6px 14px; border-radius:6px;">
+                🔄 Volver a Gestionar
+              </button>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="cerrarModalRevisionYCierre()">Cancelar</button>
+              <button type="button" class="btn btn-sm" id="btn-confirmar-cierre" onclick="confirmarCierreAccion('CERRADAS')" style="background:#10b981; color:#fff; font-weight:800; padding:8px 18px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 2px 4px rgba(16,185,129,0.3); font-size:13px;">
+                ✅ Cerrar Acción
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var datosBaulGlobal = [];
+  var listasBaulCache = null;
+
+    function extraerDriveFileId(url) {
+    if (!url) return null;
+    var u = String(url).trim();
+    if (u.startsWith('data:')) return null;
+    var m1 = u.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (m1) return m1[1];
+    var m2 = u.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (m2) return m2[1];
+    var m3 = u.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (m3) return m3[1];
+    return null;
+  }
+
+  function renderizarPrevisualizacionEvidencia(contenedorId, linkExternoId, url) {
+    var contenedor = document.getElementById(contenedorId);
+    var linkExterno = linkExternoId ? document.getElementById(linkExternoId) : null;
+    if (!contenedor) return;
+
+    var u = String(url || '').trim();
+    if (!u) {
+      contenedor.innerHTML = '<span style="color:#94a3b8; font-size:12px; padding:12px;">Sin foto adjunta</span>';
+      if (linkExterno) linkExterno.style.display = 'none';
+      return;
+    }
+
+    // 1. Imagen en Base64 directo
+    if (u.startsWith('data:')) {
+      if (linkExterno) linkExterno.style.display = 'none';
+      contenedor.innerHTML = '<img src="' + u + '" alt="Evidencia" style="max-height:280px; width:auto; max-width:100%; object-fit:contain; border-radius:6px; display:inline-block;">';
+      return;
+    }
+
+    // 2. Google Drive File
+    var fileId = extraerDriveFileId(u);
+    if (linkExterno) {
+      linkExterno.href = u;
+      linkExterno.style.display = 'inline-block';
+    }
+
+    if (fileId) {
+      var urlThumb = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1000';
+      var urlLh3   = 'https://lh3.googleusercontent.com/d/' + fileId + '=w1000';
+      var urlUc    = 'https://drive.google.com/uc?export=view&id=' + fileId;
+      var urlFrame = 'https://drive.google.com/file/d/' + fileId + '/preview';
+
+      var img = document.createElement('img');
+      img.setAttribute('referrerpolicy', 'no-referrer');
+      img.alt = 'Evidencia de Gestión';
+      img.style.maxHeight = '280px';
+      img.style.width = 'auto';
+      img.style.maxWidth = '100%';
+      img.style.objectFit = 'contain';
+      img.style.borderRadius = '6px';
+      img.style.display = 'inline-block';
+      img.style.cursor = 'pointer';
+      img.onclick = function() { window.open(u, '_blank'); };
+
+      var intento = 0;
+      img.onerror = function() {
+        intento++;
+        if (intento === 1) {
+          img.src = urlLh3;
+        } else if (intento === 2) {
+          img.src = urlUc;
+        } else {
+          // Fallback garantizado por iframe oficial de Google Drive
+          contenedor.innerHTML = '<iframe src="' + urlFrame + '" style="width:100%; height:260px; border:none; border-radius:6px; background:#fff;" allow="autoplay"></iframe>'
+                               + '<div style="margin-top:6px;"><a href="' + u + '" target="_blank" style="color:#38bdf8; font-size:12px; font-weight:700; text-decoration:underline;">↗️ Abrir foto en Google Drive</a></div>';
+        }
+      };
+
+      img.src = urlThumb;
+      contenedor.innerHTML = '';
+      contenedor.appendChild(img);
+    } else {
+      var imgExt = document.createElement('img');
+      imgExt.setAttribute('referrerpolicy', 'no-referrer');
+      imgExt.src = u;
+      imgExt.alt = 'Evidencia';
+      imgExt.style.maxHeight = '280px';
+      imgExt.style.width = 'auto';
+      imgExt.style.maxWidth = '100%';
+      imgExt.style.objectFit = 'contain';
+      imgExt.style.borderRadius = '6px';
+      imgExt.style.cursor = 'pointer';
+      imgExt.onclick = function() { window.open(u, '_blank'); };
+      imgExt.onerror = function() {
+        contenedor.innerHTML = '<div style="padding:16px; text-align:center;">'
+                             + '<span style="color:#f87171; font-size:12.5px; font-weight:700; display:block; margin-bottom:6px;">⚠️ No se pudo previsualizar</span>'
+                             + '<a href="' + u + '" target="_blank" style="color:#38bdf8; font-size:12px; font-weight:700; text-decoration:underline;">🔗 Clic para abrir imagen en Drive / Navegador</a>'
+                             + '</div>';
+      };
+      contenedor.innerHTML = '';
+      contenedor.appendChild(imgExt);
+    }
+  }
+
+  function formatearUrlDriveImagen(url) {
+    if (!url) return '';
+    var u = String(url).trim();
+    var match = u.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || u.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      return 'https://lh3.googleusercontent.com/d/' + match[1];
+    }
+    return u;
+  }
+
+  function cargarVistaBaul() {
+    cargarListasBaul();
+    cargarDatosBaul();
+  }
+
+  function cargarListasBaul() {
+    google.script.run
+      .withSuccessHandler(function(listas) {
+        if (!listas || listas.error) return;
+        listasBaulCache = listas;
+        poblarSelectsBaul(listas);
+      })
+      .obtenerListasBaul5S();
+  }
+
+  function poblarSelectsBaul(listas) {
+    // 1. Filtro de Rutina
+    var selFilRut = document.getElementById('f-baul-rutina');
+    if (selFilRut) {
+      selFilRut.innerHTML = '<option value="">Todas las Rutinas</option>';
+      var rutinasLista = ['5S'];
+      (listas.rutinas || []).forEach(function(r) {
+        if (r && !rutinasLista.includes(r)) rutinasLista.push(r);
+      });
+      rutinasLista.forEach(function(r) { selFilRut.add(new Option(r, r)); });
+      selFilRut.value = '5S';
+    }
+
+    // 2. Territorios en filtros y formularios
+    var selFilTerr = document.getElementById('f-baul-territorio');
+    var selAddTerr = document.getElementById('add-baul-territorio');
+    var selModTerr = document.getElementById('modal-edit-territorio');
+
+    if (selFilTerr) {
+      selFilTerr.innerHTML = '<option value="">Todos los Territorios</option>';
+      (listas.territorios || []).forEach(function(t) { selFilTerr.add(new Option(t, t)); });
+    }
+    if (selAddTerr) {
+      selAddTerr.innerHTML = '<option value="">Seleccione Territorio...</option>';
+      (listas.territorios || []).forEach(function(t) { selAddTerr.add(new Option(t, t)); });
+    }
+    if (selModTerr) {
+      selModTerr.innerHTML = '<option value="">Seleccione Territorio...</option>';
+      (listas.territorios || []).forEach(function(t) { selModTerr.add(new Option(t, t)); });
+    }
+
+    // 3. Rutinas en formularios
+    var selAddRut = document.getElementById('add-baul-rutina');
+    var selModRut = document.getElementById('modal-edit-rutina');
+    if (selAddRut) {
+      selAddRut.innerHTML = '<option value="">Seleccione Rutina...</option>';
+      var rutinasForm = ['5S'];
+      (listas.rutinas || []).forEach(function(r) {
+        if (r && !rutinasForm.includes(r)) rutinasForm.push(r);
+      });
+      rutinasForm.forEach(function(r) { selAddRut.add(new Option(r, r)); });
+      selAddRut.value = '5S';
+    }
+    if (selModRut) {
+      selModRut.innerHTML = '<option value="">Seleccione Rutina...</option>';
+      var rutinasMod = ['5S'];
+      (listas.rutinas || []).forEach(function(r) {
+        if (r && !rutinasMod.includes(r)) rutinasMod.push(r);
+      });
+      rutinasMod.forEach(function(r) { selModRut.add(new Option(r, r)); });
+    }
+
+    // 3. KPIs
+    var selAddKpi = document.getElementById('add-baul-kpi');
+    var selModKpi = document.getElementById('modal-edit-kpi');
+    if (selAddKpi) {
+      selAddKpi.innerHTML = '<option value="">Seleccione KPI...</option>';
+      (listas.kpis || []).forEach(function(k) { selAddKpi.add(new Option(k, k)); });
+    }
+    if (selModKpi) {
+      selModKpi.innerHTML = '<option value="">Seleccione KPI...</option>';
+      (listas.kpis || []).forEach(function(k) { selModKpi.add(new Option(k, k)); });
+    }
+
+    // 4. Responsables
+    var selFilResp = document.getElementById('lista-f-baul-responsable');
+    var selAddResp = document.getElementById('lista-add-baul-responsable');
+    var selModResp = document.getElementById('lista-modal-edit-responsable');
+    if (selFilResp) {
+      selFilResp.innerHTML = '';
+      (listas.responsables || []).forEach(function(r) { selFilResp.appendChild(new Option(r)); });
+    }
+    if (selAddResp) {
+      selAddResp.innerHTML = '';
+      (listas.responsables || []).forEach(function(r) { selAddResp.appendChild(new Option(r)); });
+    }
+    if (selModResp) {
+      selModResp.innerHTML = '';
+      (listas.responsables || []).forEach(function(r) { selModResp.appendChild(new Option(r)); });
+    }
+
+    // 5. Dueños
+    var selAddDueno = document.getElementById('add-baul-dueno');
+    var selModDueno = document.getElementById('modal-edit-dueno');
+    if (selAddDueno) {
+      selAddDueno.innerHTML = '<option value="">Seleccione Dueño...</option>';
+      (listas.duenos || []).forEach(function(d) { selAddDueno.add(new Option(d, d)); });
+    }
+    if (selModDueno) {
+      selModDueno.innerHTML = '<option value="">Seleccione Dueño...</option>';
+      (listas.duenos || []).forEach(function(d) { selModDueno.add(new Option(d, d)); });
+    }
+  }
+
+  function cargarDatosBaul() {
+    var contenedor = document.getElementById('contenedor-tabla-baul');
+    if (contenedor) contenedor.innerHTML = '<div class="cargando"><div class="spinner"></div><br>Cargando Baúl...</div>';
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.error) {
+          if (contenedor) contenedor.innerHTML = '<div class="cargando" style="color:#ef4444;">❌ ' + res.error + '</div>';
+          return;
+        }
+        datosBaulGlobal = res.datos || [];
+        
+        if (document.getElementById('baul-kpi-progreso'))   document.getElementById('baul-kpi-progreso').textContent   = res.resumen.enProgreso;
+        if (document.getElementById('baul-kpi-pendientes')) document.getElementById('baul-kpi-pendientes').textContent = res.resumen.pendientes || 0;
+        if (document.getElementById('baul-kpi-retrasadas')) document.getElementById('baul-kpi-retrasadas').textContent = res.resumen.retrasadas;
+        if (document.getElementById('baul-kpi-cerradas'))   document.getElementById('baul-kpi-cerradas').textContent   = res.resumen.cerradas;
+        if (document.getElementById('baul-kpi-total'))      document.getElementById('baul-kpi-total').textContent      = res.resumen.total;
+
+        renderTablaBaul();
+      })
+      .obtenerDatosBaul5S();
+  }
+
+    function desglosarDescripcion(desc) {
+    var partes = { pregunta: desc, novedad: '', accion: '' };
+    if (!desc) return partes;
+    if (desc.includes(' — Novedad: ') && desc.includes(' — Acción: ')) {
+      var p1 = desc.split(' — Novedad: ');
+      partes.pregunta = p1[0].trim();
+      var p2 = p1[1].split(' — Acción: ');
+      partes.novedad = p2[0].trim();
+      partes.accion = p2[1].trim();
+    } else if (desc.startsWith('[ENTREGA DE TURNO - PLAN <80%]')) {
+      partes.pregunta = 'Entrega de Turno (Plan Acción < 80%)';
+      partes.novedad = 'Bajo cumplimiento en entrega de turno';
+      partes.accion = desc.replace('[ENTREGA DE TURNO - PLAN <80%]', '').trim();
+    }
+    return partes;
+  }
+
+  function normalizarDateAInput(d) {
+    if (!d) return '';
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  function normalizarFechaYMD(fStr) {
+    if (!fStr) return '';
+    var s = String(fStr).trim();
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    var partes = s.split(/[/-]/);
+    if (partes.length === 3) {
+      if (partes[0].length === 4) {
+        return partes[0] + '-' + partes[1].padStart(2, '0') + '-' + partes[2].padStart(2, '0');
+      } else {
+        return partes[2] + '-' + partes[1].padStart(2, '0') + '-' + partes[0].padStart(2, '0');
+      }
+    }
+    return '';
+  }
+
+  function filtrarDiaHabilBaul() {
+    var hoy = new Date();
+    var diaSemana = hoy.getDay(); // 0 Dom, 6 Sab
+    var target = new Date(hoy);
+    if (diaSemana === 0) target.setDate(hoy.getDate() - 2); // Domingo -> Viernes
+    else if (diaSemana === 6) target.setDate(hoy.getDate() - 1); // Sábado -> Viernes
+    else target = hoy; // Lunes a Viernes es HOY
+
+    var ymd = normalizarDateAInput(target);
+    document.getElementById('f-baul-fecha-desde').value = ymd;
+    document.getElementById('f-baul-fecha-hasta').value = ymd;
+    renderTablaBaul();
+    mostrarToast('Filtrado por día hábil: ' + ymd, 'info');
+  }
+
+  function filtrarEstaSemanaBaul() {
+    var hoy = new Date();
+    var diaSemana = hoy.getDay();
+    var diff = (diaSemana === 0 ? -6 : 1) - diaSemana;
+    var primerDia = new Date(hoy);
+    primerDia.setDate(hoy.getDate() + diff);
+
+    document.getElementById('f-baul-fecha-desde').value = normalizarDateAInput(primerDia);
+    document.getElementById('f-baul-fecha-hasta').value = normalizarDateAInput(hoy);
+    renderTablaBaul();
+    mostrarToast('Filtrado por esta semana', 'info');
+  }
+
+  function filtrarEsteMesBaul() {
+    var hoy = new Date();
+    var primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    document.getElementById('f-baul-fecha-desde').value = normalizarDateAInput(primerDia);
+    document.getElementById('f-baul-fecha-hasta').value = normalizarDateAInput(hoy);
+    renderTablaBaul();
+    mostrarToast('Filtrado por este mes', 'info');
+  }
+
+  function filtrarEstadoDirectoBaul(estado) {
+    var sel = document.getElementById('f-baul-estado');
+    if (sel) {
+      if (sel.value === estado) {
+        sel.value = '';
+        mostrarToast('Filtro retirado: mostrando todas las acciones', 'info');
+      } else {
+        sel.value = estado;
+        if (estado) {
+          mostrarToast('Filtrando por: ' + estado, 'info');
+        } else {
+          mostrarToast('Mostrando todas las acciones', 'info');
+        }
+      }
+      renderTablaBaul();
+    }
+  }
+
+  function renderTablaBaul() {
+    var fRutina = (document.getElementById('f-baul-rutina')      || {}).value || '';
+    var fTerr   = (document.getElementById('f-baul-territorio')  || {}).value || '';
+    var fEstado = (document.getElementById('f-baul-estado')      || {}).value || '';
+    var fDesde  = (document.getElementById('f-baul-fecha-desde') || {}).value || '';
+    var fHasta  = (document.getElementById('f-baul-fecha-hasta') || {}).value || '';
+
+    // Resaltado visual en tarjetas KPI del baúl
+    var cardsKpi = document.querySelectorAll('.kpi-baul-grid .kpi-card');
+    cardsKpi.forEach(function(c) {
+      c.style.boxShadow = '';
+      c.style.transform = '';
+    });
+    if (fEstado) {
+      var mapaKpis = {
+        'EN PROGRESO': 'baul-kpi-progreso',
+        'PENDIENTE CIERRE': 'baul-kpi-pendientes',
+        'RETRASADAS': 'baul-kpi-retrasadas',
+        'CERRADAS': 'baul-kpi-cerradas'
+      };
+      var targetId = mapaKpis[fEstado];
+      if (targetId) {
+        var elVal = document.getElementById(targetId);
+        if (elVal && elVal.parentElement) {
+          elVal.parentElement.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.45)';
+          elVal.parentElement.style.transform = 'translateY(-2px)';
+        }
+      }
+    }
+
+    var filtrados = datosBaulGlobal.filter(function(d) {
+      if (fRutina) {
+        var rItem = (d.rutina || '').trim().toLowerCase();
+        var rFil = fRutina.trim().toLowerCase();
+        if (rFil === '5s') {
+          // Coincide con '5S' o si no tiene rutina explícita (acción 5S por defecto)
+          if (rItem && !rItem.includes('5s')) return false;
+        } else if (rItem !== rFil) {
+          return false;
+        }
+      }
+      if (fTerr && d.territorio !== fTerr) return false;
+      if (fEstado) {
+        if (fEstado === 'PENDIENTE CIERRE' || fEstado === 'PENDIENTE CIERRE') {
+          if (d.estado !== 'PENDIENTE CIERRE' && d.estado !== 'PENDIENTE CIERRE') return false;
+        } else if (d.estado !== fEstado) {
+          return false;
+        }
+      }
+
+      if (fDesde || fHasta) {
+        var fItem = normalizarFechaYMD(d.fechaCreacion) || normalizarFechaYMD(d.fechaCompromiso);
+        if (fItem) {
+          if (fDesde && fItem < fDesde) return false;
+          if (fHasta && fItem > fHasta) return false;
+        }
+      }
+      return true;
+    });
+
+    // Actualizar KPIs de cabecera con el conteo filtrado
+    var conteo = { enProgreso: 0, pendientes: 0, retrasadas: 0, cerradas: 0, total: filtrados.length };
+    filtrados.forEach(function(d) {
+      var est = String(d.estado || '').toUpperCase();
+      if (est === 'CERRADAS') conteo.cerradas++;
+      else if (est.includes('PENDIENTE') || est.includes('VALIDA') || est.includes('GESTIONAD') || est.includes('CIERRE')) conteo.pendientes++;
+      else if (est === 'RETRASADAS') conteo.retrasadas++;
+      else conteo.enProgreso++;
+    });
+    if (document.getElementById('baul-kpi-progreso'))   document.getElementById('baul-kpi-progreso').textContent   = conteo.enProgreso;
+    if (document.getElementById('baul-kpi-pendientes')) document.getElementById('baul-kpi-pendientes').textContent = conteo.pendientes;
+    if (document.getElementById('baul-kpi-retrasadas')) document.getElementById('baul-kpi-retrasadas').textContent = conteo.retrasadas;
+    if (document.getElementById('baul-kpi-cerradas'))   document.getElementById('baul-kpi-cerradas').textContent   = conteo.cerradas;
+    if (document.getElementById('baul-kpi-total'))      document.getElementById('baul-kpi-total').textContent      = conteo.total;
+
+    var contenedor = document.getElementById('contenedor-tabla-baul');
+    if (!contenedor) return;
+
+    if (filtrados.length === 0) {
+      contenedor.innerHTML = '<div style="padding:36px; text-align:center; color:var(--texto-muted); font-size:13.5px;">No se encontraron acciones con los filtros seleccionados.</div>';
+      return;
+    }
+
+    var html = '<div class="tabla-baul-scroll">'
+             +   '<table class="tabla-baul-etos">'
+             +     '<thead>'
+             +       '<tr>'
+             +         '<th style="width:48%;">Rutina / Hallazgo y Gestión</th>'
+             +         '<th style="width:22%;">Responsable / Vence</th>'
+             +         '<th style="width:15%;">Estado</th>'
+             +         '<th style="width:15%; text-align:center;">Acción</th>'
+             +       '</tr>'
+             +     '</thead>'
+             +     '<tbody>';
+
+    filtrados.forEach(function(d) {
+      var esCerrada = (d.estado === 'CERRADAS');
+      var esPendiente = (d.estado === 'PENDIENTE CIERRE' || d.estado === 'PENDIENTE CIERRE');
+      var pillClass = esCerrada ? 'pill-cerrada' : (d.estado === 'RETRASADAS' ? 'pill-retrasada' : (esPendiente ? 'pill-pendiente' : 'pill-progreso'));
+      var descTexto = d.descripcion || '';
+      var accTexto  = d.accion || '';
+      if (!accTexto && d.descripcion && d.descripcion.includes('— Acción:')) {
+        var partes = desglosarDescripcion(d.descripcion);
+        if (partes.novedad || partes.accion) {
+          descTexto = partes.novedad || d.descripcion;
+          accTexto  = partes.accion || '';
+        }
+      }
+
+      html += '<tr>'
+           +    '<td style="width:48%;">'
+           +      '<div style="font-weight:800; color:#2563eb; font-size:12.5px; margin-bottom:2px;">'
+           +        (d.rutina || d.territorio || '5S')
+           +        (d.territorio && d.territorio !== d.rutina ? ' <span style="font-size:11px; font-weight:600; color:#64748b;">(' + d.territorio + ')</span>' : '')
+           +      '</div>'
+           +      '<div style="font-size:12px; color:#1e293b; line-height:1.35; margin-bottom:3px;"><strong>🔍 Hallazgo:</strong> ' + descTexto + '</div>'
+           +      (accTexto ? '<div style="font-size:12px; color:#0369a1; line-height:1.35; margin-bottom:4px;"><strong>⚡ Acción:</strong> ' + accTexto + '</div>' : '')
+           +      (d.comentario ? '<div style="margin-top:5px; padding:5px 8px; background:#f0fdf4; border-left:3px solid #16a34a; border-radius:4px; font-size:11.5px; color:#14532d; line-height:1.35;"><strong>🛠️ Gestión:</strong> ' + d.comentario + '</div>' : '')
+           +      (d.imagenUrl ? '<div style="margin-top:4px;"><span style="font-size:11px; font-weight:700; color:#0284c7; background:#f0f9ff; padding:2px 7px; border-radius:4px; border:1px solid #bae6fd;">📸 Con Evidencia</span></div>' : '')
+           +    '</td>'
+           +    '<td style="width:22%;">'
+           +      '<div style="font-weight:700; color:#1e293b; font-size:12px; line-height:1.3;">👤 ' + (d.responsable || '—') + '</div>'
+           +      '<div style="font-size:11px; color:#64748b; margin-top:3px;">📅 Vence: <strong>' + (d.fechaCompromiso || '—') + '</strong></div>'
+           +      (d.diasRetraso > 0 && d.estado === 'RETRASADAS' ? '<div style="color:#ef4444; font-size:10.5px; font-weight:800; margin-top:2px;">⚠️ ' + d.diasRetraso + 'd tarde</div>' : '')
+           +    '</td>'
+           +    '<td style="width:15%;">'
+           +      '<span class="pill-estado ' + pillClass + '">' + (esPendiente ? 'PENDIENTE CIERRE' : d.estado) + '</span>'
+           +    '</td>'
+           +    '<td style="width:15%; text-align:center;">'
+           +      (esCerrada
+                    ? '<button type="button" class="btn btn-sm" onclick="abrirModalVerDetalle(' + d.filaIndex + ')" title="Ver gestión y evidencias" style="background:#64748b; color:#fff; font-weight:700; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; font-size:11.5px; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:4px;">Ver</button>'
+                    : (esPendiente
+                        ? (obtenerUsuarioSesion()
+                            ? '<button type="button" class="btn btn-sm" onclick="abrirModalRevisionYCierre(' + d.filaIndex + ')" title="Validar evidencia y cerrar acción" style="background:#10b981; color:#fff; font-weight:800; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; font-size:11.5px; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:4px;">Validar Cierre</button>'
+                            : '<button type="button" class="btn btn-sm" onclick="abrirModalVerDetalle(' + d.filaIndex + ')" title="Acción gestionada, pendiente de validación" style="background:#0284c7; color:#fff; font-weight:700; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; font-size:11.5px; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:4px;">Gestionado</button>'
+                          )
+                        : '<button type="button" class="btn btn-sm" onclick="abrirModalEditar(' + d.filaIndex + ')" title="Gestionar y subir evidencia" style="background:#f59e0b; color:#fff; font-weight:700; padding:6px 12px; border:none; border-radius:6px; cursor:pointer; font-size:11.5px; width:100%; display:inline-flex; align-items:center; justify-content:center; gap:4px;">✏️ Gestionar</button>'
+                      )
+                  )
+           +    '</td>'
+           +  '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    contenedor.innerHTML = html;
+  }
+
+  function limpiarFiltrosBaul() {
+    if (document.getElementById('f-baul-rutina'))      document.getElementById('f-baul-rutina').value      = '';
+    if (document.getElementById('f-baul-territorio'))  document.getElementById('f-baul-territorio').value  = '';
+    if (document.getElementById('f-baul-estado'))      document.getElementById('f-baul-estado').value      = '';
+    if (document.getElementById('f-baul-fecha-desde')) document.getElementById('f-baul-fecha-desde').value = '';
+    if (document.getElementById('f-baul-fecha-hasta')) document.getElementById('f-baul-fecha-hasta').value = '';
+    renderTablaBaul();
+  }
+
+  function abrirBaulAgregar() {
+    document.getElementById('baul-lista').style.display   = 'none';
+    document.getElementById('baul-agregar').style.display = 'block';
+
+    var hoy = new Date().toISOString().split('T')[0];
+    document.getElementById('add-baul-fecha-comp').value = hoy;
+  }
+
+  function abrirBaulLista() {
+    document.getElementById('baul-agregar').style.display = 'none';
+    document.getElementById('baul-lista').style.display   = 'block';
+  }
+
+  function onTerritorioBaulAddCambia() {
+    var terr = document.getElementById('add-baul-territorio').value;
+    if (configTerritoriosGlobal) {
+      var t = configTerritoriosGlobal.find(function(x) { return x.nombre === terr; });
+      if (t && t.duenoBi && document.getElementById('add-baul-dueno')) {
+        document.getElementById('add-baul-dueno').value = t.duenoBi;
+      }
+    }
+  }
+
+  function guardarNuevaAccionBaul(e) {
+    e.preventDefault();
+    
+    var btn = document.getElementById('btn-guardar-nueva-baul');
+    if (btn.disabled) return; // Prevención de doble clic
+    
+    var terr  = document.getElementById('add-baul-territorio').value;
+    var rut   = document.getElementById('add-baul-rutina').value;
+    var kpi   = document.getElementById('add-baul-kpi').value;
+    var resp  = document.getElementById('add-baul-responsable').value;
+    var dueno = document.getElementById('add-baul-dueno').value;
+    var fComp = document.getElementById('add-baul-fecha-comp').value;
+    var desc  = document.getElementById('add-baul-descripcion').value.trim();
+    var acc   = (document.getElementById('add-baul-accion') ? document.getElementById('add-baul-accion').value : '').trim();
+
+    if (!desc) { mostrarToast('La descripción del hallazgo es obligatoria.', 'error'); return; }
+    if (!acc)  { mostrarToast('La acción requerida es obligatoria.', 'error'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Guardando acción...';
+
+    var payload = {
+      territorio:      terr,
+      rutina:          rut,
+      kpi:             kpi,
+      responsable:     resp,
+      dueno:           dueno,
+      fechaCompromiso: fComp,
+      descripcion:     desc,
+      accion:          acc
+    };
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.textContent = '💾 Registrar Acción';
+        if (res.error) { mostrarToast('Error: ' + res.error, 'error'); return; }
+
+        mostrarToast('Acción guardada exitosamente.', 'exito');
+        document.getElementById('form-add-baul').reset();
+        abrirBaulLista();
+        cargarDatosBaul();
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        btn.textContent = '💾 Registrar Acción';
+        mostrarToast('Error: ' + err.message, 'error');
+      })
+      .agregarAccionBaul5S(payload);
+  }
+
+    // ── Modal de Ver Detalle (Solo Lectura) ────────────────────────
+  function abrirModalVerDetalle(filaIndex) {
+    try {
+      var accion = (datosBaulGlobal || []).find(function(d) { return String(d.filaIndex) === String(filaIndex); });
+      if (!accion) {
+        console.warn('Acción no encontrada en datosBaulGlobal para fila:', filaIndex);
+        return;
+      }
+
+      var esCerrada = (accion.estado === 'CERRADAS');
+      var esPendiente = (accion.estado === 'PENDIENTE CIERRE' || accion.estado === 'PENDIENTE VALIDACIÓN');
+
+      var elTitulo = document.getElementById('ver-modal-titulo');
+      if (elTitulo) elTitulo.textContent = esCerrada ? 'Detalle de Acción Cerrada' : 'Consulta de Acción Gestionada';
+
+      var elSub = document.getElementById('ver-modal-subtitulo');
+      if (elSub) elSub.textContent = esCerrada ? 'Acción finalizada y verificada (Solo lectura)' : 'Gestión enviada, pendiente de validación';
+
+      var elRutina = document.getElementById('ver-modal-rutina');
+      if (elRutina) elRutina.textContent = accion.rutina || accion.territorio || '5S';
+
+      var elTerr = document.getElementById('ver-modal-territorio');
+      if (elTerr) elTerr.textContent = (accion.territorio && accion.territorio !== accion.rutina) ? ('(' + accion.territorio + ')') : '';
+
+      var pill = document.getElementById('ver-modal-estado-pill');
+      if (pill) {
+        pill.className = 'pill-estado ' + (esCerrada ? 'pill-cerrada' : (esPendiente ? 'pill-pendiente' : 'pill-progreso'));
+        pill.textContent = accion.estado;
+      }
+
+      var partes = desglosarDescripcion(accion.descripcion);
+      var elHallazgo = document.getElementById('ver-modal-hallazgo');
+      if (elHallazgo) {
+        elHallazgo.textContent = partes.novedad || partes.accion ? ((partes.novedad ? partes.novedad + '. ' : '') + (partes.accion || '')) : (accion.descripcion || 'Sin descripción');
+      }
+
+      var elGestion = document.getElementById('ver-modal-gestion');
+      if (elGestion) elGestion.textContent = accion.comentario || 'Sin comentario de gestión registrado.';
+
+      var elResp = document.getElementById('ver-modal-responsable');
+      if (elResp) elResp.textContent = accion.responsable || 'Sin asignar';
+
+      var elVence = document.getElementById('ver-modal-vence');
+      if (elVence) elVence.textContent = accion.fechaCompromiso || '—';
+
+      // Carga de la foto bajo demanda (solo cuando se abre este modal)
+      var secFoto = document.getElementById('ver-modal-seccion-foto');
+      var sinFoto = document.getElementById('ver-modal-sin-foto');
+      var imgFoto = document.getElementById('ver-modal-foto-img');
+      var linkFoto = document.getElementById('ver-modal-foto-link');
+
+      if (accion.imagenUrl && accion.imagenUrl.trim() !== '') {
+        var urlDrive = formatearUrlDriveImagen(accion.imagenUrl);
+        if (imgFoto) {
+          imgFoto.style.display = 'inline-block';
+          imgFoto.src = urlDrive;
+          imgFoto.onerror = function() {
+            this.style.display = 'none';
+          };
+        }
+        if (linkFoto) linkFoto.href = accion.imagenUrl;
+        if (secFoto) secFoto.style.display = 'block';
+        if (sinFoto) sinFoto.style.display = 'none';
+      } else {
+        if (imgFoto) imgFoto.src = '';
+        if (secFoto) secFoto.style.display = 'none';
+        if (sinFoto) sinFoto.style.display = 'block';
+      }
+
+      var btnModificar = document.getElementById('ver-modal-btn-modificar');
+      if (btnModificar) {
+        if (accion.estado !== 'CERRADAS') {
+          btnModificar.style.display = 'inline-flex';
+          btnModificar.setAttribute('data-fila', filaIndex);
+        } else {
+          btnModificar.style.display = 'none';
+        }
+      }
+
+      var modal = document.getElementById('modal-ver-detalle');
+      if (modal) modal.style.display = 'flex';
+    } catch(err) {
+      console.error('Error al abrir modal ver detalle:', err);
+    }
+  }
+
+  
+  function modificarDesdeDetalle() {
+    var btnModificar = document.getElementById('ver-modal-btn-modificar');
+    var filaIndex = btnModificar ? btnModificar.getAttribute('data-fila') : null;
+    cerrarModalVerDetalle();
+    if (filaIndex) abrirModalEditar(filaIndex);
+  }
+
+  function modificarGestionDesdeValidacion() {
+    var filaIndex = document.getElementById('modal-cierre-index').value;
+    cerrarModalRevisionYCierre();
+    abrirModalEditar(filaIndex);
+  }
+
+  function cerrarModalVerDetalle() {
+    var modal = document.getElementById('modal-ver-detalle');
+    if (modal) modal.style.display = 'none';
+    var imgFoto = document.getElementById('ver-modal-foto-img');
+    if (imgFoto) imgFoto.src = '';
+  }
+
+  // ── Previsualización de Foto en Modal Editar ─────────────────
+  function mostrarFotoEnModalEditar(url) {
+    var box = document.getElementById('modal-evidencia-preview-box');
+    var vacia = document.getElementById('modal-evidencia-vacia');
+    var img = document.getElementById('modal-evidencia-img');
+    var hiddenInp = document.getElementById('modal-edit-evidencia');
+    
+    // NUNCA guardar base64 en hiddenInp para que jamás viaje a Google Sheets
+    if (hiddenInp && url && !url.startsWith('data:')) {
+      hiddenInp.value = url;
+    } else if (hiddenInp && !url) {
+      hiddenInp.value = '';
+    }
+
+    if (url && (url.startsWith('http') || url.startsWith('data:'))) {
+      if (img) img.src = formatearUrlDriveImagen(url);
+      if (box) box.style.display = 'block';
+      if (vacia) vacia.style.display = 'none';
+    } else {
+      if (img) img.src = '';
+      if (box) box.style.display = 'none';
+      if (vacia) vacia.style.display = 'block';
+    }
+  }
+
+  // ── Modal de Edición de Estado (Estilo ETO) ───────────────────
+  function abrirModalEditar(filaIndex) {
+    var accion = (datosBaulGlobal || []).find(function(d) { return String(d.filaIndex) === String(filaIndex); });
+    if (!accion) return;
+
+    document.getElementById('modal-edit-index').value = filaIndex;
+    document.getElementById('modal-edit-subtitulo').textContent = 'Fila ' + filaIndex + ' | ' + (accion.territorio || 'S/T');
+
+    if (document.getElementById('modal-edit-territorio'))   document.getElementById('modal-edit-territorio').value = accion.territorio || '';
+    if (document.getElementById('modal-edit-rutina'))       document.getElementById('modal-edit-rutina').value     = accion.rutina || '';
+    if (document.getElementById('modal-edit-kpi'))          document.getElementById('modal-edit-kpi').value        = accion.kpi || '';
+    if (document.getElementById('modal-edit-responsable'))  document.getElementById('modal-edit-responsable').value= accion.responsable || '';
+    if (document.getElementById('modal-edit-dueno'))        document.getElementById('modal-edit-dueno').value      = accion.dueno || '';
+    if (document.getElementById('modal-edit-fecha-inicio')) document.getElementById('modal-edit-fecha-inicio').value = accion.fechaCreacion || '';
+    if (document.getElementById('modal-edit-fecha-comp'))   document.getElementById('modal-edit-fecha-comp').value = accion.fechaCompromiso || '';
+    
+    var elDesc = document.getElementById('modal-edit-desc');
+    if (elDesc) {
+      var txtDesc = accion.descripcion || '';
+      if (accion.accion) {
+        txtDesc += (txtDesc ? '\n• Acción a realizar: ' : '') + accion.accion;
+      }
+      elDesc.innerText = txtDesc || 'Sin descripción';
+    }
+
+    // Extraer acción realizada previa si existe
+    var accionRealizada = '';
+    if (accion.comentario) {
+      if (accion.comentario.includes('Aprobado por:')) {
+        var partes = accion.comentario.split('Aprobado por:');
+        accionRealizada = partes[0].replace(/\|\s*$/, '').trim();
+      } else if (accion.comentario.includes('Cerrada por:')) {
+        var partes = accion.comentario.split('Cerrada por:');
+        accionRealizada = partes[0].replace(/\|\s*$/, '').trim();
+      } else {
+        accionRealizada = accion.comentario;
+      }
+    }
+    if (document.getElementById('modal-edit-accion-realizada')) document.getElementById('modal-edit-accion-realizada').value = accionRealizada;
+    if (document.getElementById('modal-foto-status'))           document.getElementById('modal-foto-status').textContent = '';
+
+    // Mostrar foto visualmente (sin enlace de Drive)
+    mostrarFotoEnModalEditar(accion.imagenUrl);
+
+
+    
+
+    // BLOQUEO TOTAL SI YA ESTÁ CERRADA: "ya luego no se modifica"
+    var esCerrada = (accion.estado === 'CERRADAS');
+    var alertaBloq = document.getElementById('modal-edit-bloqueado-alerta');
+    if (alertaBloq) alertaBloq.style.display = esCerrada ? 'flex' : 'none';
+
+    var campos = [
+      'modal-edit-territorio', 'modal-edit-rutina', 'modal-edit-kpi',
+      'modal-edit-responsable', 'modal-edit-dueno', 'modal-edit-fecha-comp',
+      'modal-edit-accion-realizada'
+    ];
+    campos.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.disabled = esCerrada;
+    });
+
+    var btnCam = document.getElementById('btn-tomar-foto-modal');
+    if (btnCam) btnCam.style.display = esCerrada ? 'none' : 'inline-flex';
+
+    var user = (typeof obtenerUsuarioSesion === 'function') ? obtenerUsuarioSesion() : null;
+
+    var btnEliminar = document.getElementById('btn-modal-eliminar');
+    if (btnEliminar) btnEliminar.style.display = user ? 'inline-flex' : 'none';
+
+    var btnGuardar = document.getElementById('btn-modal-guardar-edit');
+    if (btnGuardar) {
+      btnGuardar.style.display = esCerrada ? 'none' : 'inline-block';
+      btnGuardar.textContent = '📤 Guardar Gestión';
+      btnGuardar.style.background = '#2563eb';
+    }
+
+    document.getElementById('modal-editar-baul').style.display = 'flex';
+  }
+
+  function cerrarModalEditarBaul() {
+    document.getElementById('modal-editar-baul').style.display = 'none';
+  }
+
+  function verificarPermisoCierre() {
+    // Cierre sin bloqueos
+  }
+
+  function solicitarLoginParaCerrar() {
+    // Cierre sin bloqueos
+  }
+
+  // ── Subida de foto desde celular o cámara ─────────────────────
+  function procesarFotoCamara(input) {
+    if (!input.files || input.files.length === 0) return;
+    var file = input.files[0];
+    var statusEl = document.getElementById('modal-foto-status');
+    if (statusEl) statusEl.textContent = '⏳ Procesando imagen...';
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        // Redimensionar y comprimir dinámicamente para garantizar que jamás supere el límite de celda (50,000 caracteres)
+        var maxDim = 520;
+        var quality = 0.58;
+        var dataUrl = '';
+        var intentos = 0;
+
+        do {
+          var width = img.width;
+          var height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+          intentos++;
+          if (dataUrl.length > 36000) {
+            maxDim = Math.round(maxDim * 0.75);
+            quality = Math.max(0.28, quality - 0.1);
+          } else {
+            break;
+          }
+        } while (dataUrl.length > 36000 && intentos < 5);
+
+        // Previsualizar inmediatamente en contenedor visual
+        mostrarFotoEnModalEditar(dataUrl);
+
+        if (statusEl) statusEl.textContent = '☁️ Subiendo evidencia a Google Drive...';
+        var btnGuardar = document.getElementById('btn-modal-guardar-edit');
+        if (btnGuardar) {
+          btnGuardar.disabled = true;
+          btnGuardar.textContent = 'Subiendo a Drive...';
+        }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (btnGuardar) {
+              btnGuardar.disabled = false;
+              btnGuardar.textContent = '📤 Guardar Gestión';
+            }
+            if (res && res.error) {
+              if (statusEl) statusEl.textContent = '❌ ' + res.error;
+              mostrarToast('Error al subir a Drive: ' + res.error, 'error');
+              return;
+            }
+            if (res && res.url) {
+              if (statusEl) statusEl.textContent = '✅ Evidencia guardada en Drive';
+              mostrarFotoEnModalEditar(res.url);
+              mostrarToast('Foto guardada en Google Drive', 'exito');
+            }
+          })
+          .withFailureHandler(function(err) {
+            if (btnGuardar) {
+              btnGuardar.disabled = false;
+              btnGuardar.textContent = '📤 Guardar Gestión';
+            }
+            if (statusEl) statusEl.textContent = '❌ Error de conexión';
+            mostrarToast('Error al conectar con Drive: ' + err.message, 'error');
+          })
+          .subirEvidenciaBaul5S(dataUrl, 'evidencia_' + Date.now() + '.jpg', 'image/jpeg');
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function guardarEdicionDesdeModal(e) {
+    e.preventDefault();
+    var filaIndex       = parseInt(document.getElementById('modal-edit-index').value);
+    var terr            = document.getElementById('modal-edit-territorio').value;
+    var rut             = document.getElementById('modal-edit-rutina').value;
+    var kpi             = document.getElementById('modal-edit-kpi').value;
+    var resp            = document.getElementById('modal-edit-responsable').value;
+    var dueno           = document.getElementById('modal-edit-dueno').value;
+    var fComp           = document.getElementById('modal-edit-fecha-comp').value;
+    var accionRealizada = ((document.getElementById('modal-edit-accion-realizada') || {}).value || '').trim();
+    var evidencia       = ((document.getElementById('modal-edit-evidencia') || {}).value || '').trim();
+
+    if (!accionRealizada) {
+      mostrarToast('❌ Es OBLIGATORIO ingresar la nota o comentario de la gestión realizada.', 'error');
+      return;
+    }
+
+    if (!evidencia) {
+      mostrarToast('❌ Es OBLIGATORIO adjuntar la foto y esperar que suba a Drive antes de guardar.', 'error');
+      return;
+    }
+
+    var user = (typeof obtenerUsuarioSesion === 'function') ? obtenerUsuarioSesion() : null;
+    var estadoFinal = 'PENDIENTE CIERRE';
+
+    var textoNota = accionRealizada;
+    if (user) {
+      var quien = user.nombre || user.id || 'admin';
+      textoNota += ' | Gestionada por: ' + quien;
+    } else {
+      textoNota += ' | Gestionada (Pendiente cierre)';
+    }
+
+    var btn = document.getElementById('btn-modal-guardar-edit');
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+
+    var payload = {
+      filaIndex:       filaIndex,
+      territorio:      terr,
+      rutina:          rut,
+      kpi:             kpi,
+      responsable:     resp,
+      dueno:           dueno,
+      fechaCompromiso: fComp,
+      estado:          estadoFinal,
+      comentario:      textoNota,
+      evidencia:       evidencia,
+      usuario:         user ? (user.nombre || user.id) : 'admin'
+    };
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.disabled = false;
+        if (res && res.error) { mostrarToast('Error: ' + res.error, 'error'); return; }
+
+        cerrarModalEditarBaul();
+        var msg = '📤 Gestión guardada exitosamente. Lista para validar y cerrar.';
+        mostrarToast(msg, 'exito');
+        cargarDatosBaul();
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        mostrarToast('Error al conectar: ' + err.message, 'error');
+      })
+      .guardarEdicionBaul5S(payload);
+  }
+
+  function eliminarAccionBaulConfirmado() {
+    var filaIndex = parseInt(document.getElementById('modal-edit-index').value);
+    if (!confirm('¿Está seguro de que desea eliminar permanentemente esta acción?')) return;
+
+    var btn = document.getElementById('btn-modal-eliminar');
+    if (btn) { btn.disabled = true; btn.textContent = 'Borrando...'; }
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (btn) { btn.disabled = false; btn.textContent = '🗑️ Eliminar'; }
+        if (res.error) { mostrarToast('Error al eliminar: ' + res.error, 'error'); return; }
+        
+        cerrarModalEditarBaul();
+        mostrarToast('Acción eliminada correctamente.', 'exito');
+        cargarDatosBaul();
+      })
+      .withFailureHandler(function(err) {
+        if (btn) { btn.disabled = false; btn.textContent = '🗑️ Eliminar'; }
+        mostrarToast('Error al conectar: ' + err.message, 'error');
+      })
+      .eliminarAccionBaul5S(filaIndex);
+  }
+
+  // ── Modal de Validación y Cierre Directo ──────────────────────
+  function abrirModalRevisionYCierre(filaIndex) {
+    try {
+      var accion = (datosBaulGlobal || []).find(function(a) { return String(a.filaIndex) === String(filaIndex); });
+      if (!accion) {
+        mostrarToast('No se encontró la acción seleccionada.', 'error');
+        return;
+      }
+
+      var elIndex = document.getElementById('modal-cierre-index');
+      if (elIndex) elIndex.value = filaIndex;
+
+      var elMeta = document.getElementById('cierre-meta-header');
+      if (elMeta) elMeta.textContent = (accion.territorio || 'General') + ' | Responsable: ' + (accion.responsable || 'Sin Asignar');
+
+      var elDesc = document.getElementById('cierre-desc-hallazgo');
+      if (elDesc) elDesc.textContent = accion.descripcion || 'Sin descripción';
+
+      var elAccion = document.getElementById('cierre-accion-realizada');
+      if (elAccion) elAccion.textContent = accion.comentario || 'Acción reportada en terreno.';
+
+      var elNota = document.getElementById('cierre-nota-opcional');
+      if (elNota) elNota.value = '';
+
+      // Manejo de la foto de evidencia visible
+      var secFoto = document.getElementById('cierre-evidencia-seccion');
+      var sinFoto = document.getElementById('cierre-sin-evidencia-alerta');
+      var btnConfirmar = document.getElementById('btn-confirmar-cierre');
+
+      var imgStr = String(accion.imagenUrl || '').trim();
+      if (imgStr !== '') {
+        if (secFoto) secFoto.style.display = 'block';
+        if (sinFoto) sinFoto.style.display = 'none';
+        renderizarPrevisualizacionEvidencia('cierre-evidencia-box', 'cierre-evidencia-link-externo', imgStr);
+      } else {
+        if (secFoto) secFoto.style.display = 'none';
+        if (sinFoto) sinFoto.style.display = 'block';
+      }
+
+      if (btnConfirmar) {
+        btnConfirmar.disabled = false;
+        btnConfirmar.style.opacity = '1';
+        btnConfirmar.style.cursor = 'pointer';
+        btnConfirmar.textContent = '✅ Cerrar Acción';
+      }
+
+      // Identificación de usuario autorizador
+      var user = (typeof obtenerUsuarioSesion === 'function') ? obtenerUsuarioSesion() : null;
+      var boxConSesion = document.getElementById('cierre-box-sesion-activa');
+      var boxSinSesion = document.getElementById('cierre-box-sin-sesion');
+      var elNombre = document.getElementById('cierre-nombre-sesion');
+      var inpId = document.getElementById('cierre-user-id-input');
+
+      var nomUser = (user && (user.nombre || user.id)) ? (user.nombre || user.id) : 'admin';
+      if (boxConSesion) boxConSesion.style.display = 'flex';
+      if (boxSinSesion) boxSinSesion.style.display = 'none';
+      if (elNombre) elNombre.textContent = nomUser;
+      if (inpId) inpId.value = nomUser;
+
+      var modal = document.getElementById('modal-validar-cerrar');
+      if (modal) modal.style.display = 'flex';
+    } catch(err) {
+      console.error('Error al abrir modal revisión y cierre:', err);
+      mostrarToast('Error al abrir ventana de validación: ' + err.message, 'error');
+    }
+  }
+
+  function cerrarModalRevisionYCierre() {
+    document.getElementById('modal-validar-cerrar').style.display = 'none';
+  }
+
+  function confirmarCierreAccion(nuevoEstado) {
+    try {
+      var filaIndex = parseInt(document.getElementById('modal-cierre-index').value);
+      var nota = (document.getElementById('cierre-nota-opcional').value || '').trim();
+      var user = (typeof obtenerUsuarioSesion === 'function') ? obtenerUsuarioSesion() : null;
+      var quienCierra = ((document.getElementById('cierre-user-id-input') || {}).value || '').trim();
+
+      var estadoFinal = nuevoEstado || 'CERRADAS';
+      var comentarioFinal = nota;
+      if (estadoFinal === 'EN PROGRESO' && !comentarioFinal) {
+        comentarioFinal = 'Devuelta para volver a gestionar.';
+      }
+
+      var payload = {
+        filaIndex: filaIndex,
+        nuevoEstado: estadoFinal,
+        comentario: comentarioFinal,
+        nombreUsuario: (user && (user.nombre || user.id)) ? (user.nombre || user.id) : (quienCierra || 'admin')
+      };
+
+      var btn = document.getElementById('btn-confirmar-cierre');
+      var btnDev = document.getElementById('btn-cierre-devolver');
+      if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
+      if (btnDev) btnDev.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) { btn.disabled = false; btn.textContent = '✅ Cerrar Acción'; }
+          if (btnDev) btnDev.disabled = false;
+
+          if (res && res.error) {
+            mostrarToast('Error: ' + res.error, 'error');
+            return;
+          }
+
+          cerrarModalRevisionYCierre();
+          var msg = (estadoFinal === 'CERRADAS') ? '✅ Acción cerrada exitosamente.' : '🔄 Acción devuelta para volver a gestionar.';
+          mostrarToast(msg, 'exito');
+          cargarDatosBaul();
+        })
+        .withFailureHandler(function(err) {
+          if (btn) { btn.disabled = false; btn.textContent = '✅ Cerrar Acción'; }
+          if (btnDev) btnDev.disabled = false;
+          mostrarToast('Error de comunicación: ' + err.message, 'error');
+        })
+        .cerrarAccionDirecta(payload);
+    } catch(err) {
+      console.error('Error al confirmar cierre:', err);
+      mostrarToast('Error al procesar: ' + err.message, 'error');
+    }
+  }
+
+  function enviarAccionAValidacion() {
+    var filaIndex = parseInt(document.getElementById('modal-edit-index').value);
+    if (!filaIndex) return;
+
+    var evidencia = ((document.getElementById('modal-edit-evidencia') || {}).value || '').trim();
+    if (!evidencia) {
+      mostrarToast('❌ Para gestionar la acción es OBLIGATORIO adjuntar foto de evidencia.', 'error');
+      return;
+    }
+
+    var accionRealizada = ((document.getElementById('modal-edit-accion-realizada') || {}).value || '').trim();
+    var com = ((document.getElementById('modal-edit-comentario') || {}).value || '').trim();
+    var nota = accionRealizada;
+    if (com) nota = nota ? (nota + ' | ' + com) : com;
+
+    var payload = {
+      filaIndex: filaIndex,
+      nuevoEstado: 'PENDIENTE CIERRE',
+      comentario: nota,
+      evidencia: evidencia,
+      nombreUsuario: 'Gestor (Pendiente)'
+    };
+
+    var btn = document.getElementById('btn-modal-enviar-validacion');
+    if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Enviar a Pendiente Cierre'; }
+        if (res && res.error) {
+          mostrarToast('Error: ' + res.error, 'error');
+          return;
+        }
+        cerrarModalEditarBaul();
+        mostrarToast('✅ Acción gestionada y enviada a validación.', 'exito');
+        cargarDatosBaul();
+      })
+      .withFailureHandler(function(err) {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Enviar a Pendiente Cierre'; }
+        mostrarToast('Error al conectar: ' + err, 'error');
+      })
+      .cerrarAccionDirecta(payload);
+  }
+
+  function cerrarAccionDirectaDesdeEdicion() {
+    var filaIndex = parseInt(document.getElementById('modal-edit-index').value);
+    if (!filaIndex) {
+      mostrarToast('No se identificó la fila a cerrar', 'error');
+      return;
+    }
+
+    var evidencia = ((document.getElementById('modal-edit-evidencia') || {}).value || '').trim();
+    if (!evidencia) {
+      mostrarToast('❌ Para cerrar la acción es OBLIGATORIO adjuntar la foto de evidencia.', 'error');
+      return;
+    }
+
+    var accionRealizada = ((document.getElementById('modal-edit-accion-realizada') || {}).value || '').trim();
+    var com = ((document.getElementById('modal-edit-comentario') || {}).value || '').trim();
+    var user = (typeof obtenerUsuarioSesion === 'function') ? obtenerUsuarioSesion() : null;
+
+    var nota = accionRealizada;
+    if (com) nota = nota ? (nota + ' | ' + com) : com;
+
+    var payload = {
+      filaIndex: filaIndex,
+      nuevoEstado: 'CERRADAS',
+      comentario: nota,
+      evidencia: evidencia,
+      nombreUsuario: (user && (user.nombre || user.id)) ? (user.nombre || user.id) : 'admin'
+    };
+
+    var btn = document.getElementById('btn-modal-cerrar-directo');
+    if (btn) { btn.disabled = true; btn.textContent = 'Cerrando...'; }
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (btn) { btn.disabled = false; btn.textContent = '✅ Cerrar Acción Ahora'; }
+        if (res && res.error) {
+          mostrarToast('Error: ' + res.error, 'error');
+          return;
+        }
+        cerrarModalEditarBaul();
+        mostrarToast('✅ Acción cerrada exitosamente.', 'exito');
+        cargarDatosBaul();
+      })
+      .withFailureHandler(function(err) {
+        if (btn) { btn.disabled = false; btn.textContent = '✅ Cerrar Acción Ahora'; }
+        mostrarToast('Error al conectar: ' + err, 'error');
+      })
+      .cerrarAccionDirecta(payload);
+  }
+
+  // ── Modal de Reporte de Acciones Retrasadas ───────────────────
+  function abrirModalReporteRetrasadas() {
+    var modal = document.getElementById('modal-reporte-retrasadas');
+    modal.style.display = 'flex';
+    document.getElementById('texto-reporte-retrasadas').value = 'Generando reporte de retrasadas...';
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.error) {
+          document.getElementById('texto-reporte-retrasadas').value = 'Error: ' + res.error;
+          return;
+        }
+
+        document.getElementById('rep-total-num').textContent = res.total;
+        var terrs = Object.keys(res.porTerritorio || {});
+        document.getElementById('rep-territorios-num').textContent = terrs.length;
+        document.getElementById('texto-reporte-retrasadas').value = res.textoReporte;
+      })
+      .generarReporteAccionesRetrasadas();
+  }
+
+  function cerrarModalReporteRetrasadas() {
+    document.getElementById('modal-reporte-retrasadas').style.display = 'none';
+  }
+
+  function copiarReporteRetrasadas() {
+    var txt = document.getElementById('texto-reporte-retrasadas');
+    txt.select();
+    txt.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(txt.value).then(function() {
+      mostrarToast('Reporte copiado al portapapeles.', 'exito');
+    }).catch(function() {
+      document.execCommand('copy');
+      mostrarToast('Reporte copiado.', 'exito');
+    });
+  }
+
+</script>

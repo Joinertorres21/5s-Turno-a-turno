@@ -1,0 +1,406 @@
+<!-- VistaKpiBaul.html — Módulo Dashboard KPI y Análisis Visual de Acciones 5S -->
+<div id="vista-kpi-baul" class="vista">
+  <div class="contenedor aud-contenedor-mobile">
+
+    <!-- Header del Dashboard KPI -->
+    <div class="barra-accion" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <button class="btn btn-ghost btn-sm" onclick="cambiarVista('baul')" style="font-weight:700; color:#2563eb; display:inline-flex; align-items:center; gap:4px; padding:6px 12px; border-radius:8px; border:1px solid #bfdbfe; background:#eff6ff;">
+          ← Ir al Baúl
+        </button>
+        <div>
+          <h2 style="font-size:18px; font-weight:800; margin:0; display:flex; align-items:center; gap:8px;">
+            <span>📊</span> Dashboard Baúl
+          </h2>
+          <span style="font-size:11.5px; color:var(--texto-muted);">Análisis visual de cumplimiento y desempeño por territorio</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="btn btn-ghost btn-sm" onclick="cargarVistaKpiBaul()" style="border:1px solid var(--gris-borde); display:inline-flex; align-items:center; gap:5px;">
+          🔄 Actualizar Datos
+        </button>
+      </div>
+    </div>
+
+    <!-- Filtros Interactivos del Dashboard KPI -->
+    <div class="card-5s" style="padding:14px; margin-bottom:16px; border-radius:12px; border:1px solid #e2e8f0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+        <div style="font-size:12px; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:6px;">
+          <span>🔍</span> Filtros para Análisis KPI
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-sm btn-ghost" onclick="filtrarDiaHabilKpi()" style="font-size:11.5px; font-weight:700; border:1px solid #bae6fd; background:#f0f9ff; color:#0369a1; padding:4px 10px; border-radius:6px; cursor:pointer;">
+            ⚡ Día Hábil
+          </button>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="filtrarEstaSemanaKpi()" style="font-size:11.5px; font-weight:700; border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:4px 10px; border-radius:6px; cursor:pointer;">
+            📅 Esta Semana
+          </button>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="filtrarEsteMesKpi()" style="font-size:11.5px; font-weight:700; border:1px solid #e2e8f0; background:#f8fafc; color:#475569; padding:4px 10px; border-radius:6px; cursor:pointer;">
+            📅 Este Mes
+          </button>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="limpiarFiltrosKpi()" style="font-size:11.5px; font-weight:700; border:1px solid #e2e8f0; background:#fff; color:#64748b; padding:4px 10px; border-radius:6px; cursor:pointer;">
+            🔄 Todos
+          </button>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:flex-end;">
+        <div class="filtro-grupo">
+          <label style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; display:block;">Territorio</label>
+          <select id="f-kpi-territorio" class="form-control-5s" onchange="renderizarDashboardKpiAcciones()" style="border-radius:8px;">
+            <option value="">Todos los Territorios</option>
+          </select>
+        </div>
+        <div class="filtro-grupo">
+          <label style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; display:block;">Responsable</label>
+          <input list="lista-f-kpi-responsable" id="f-kpi-responsable" class="form-control-5s" placeholder="Todos los Responsables" onchange="renderizarDashboardKpiAcciones()" style="border-radius:8px;">
+          <datalist id="lista-f-kpi-responsable"></datalist>
+        </div>
+        <div class="filtro-grupo">
+          <label style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; display:block;">Fecha Desde</label>
+          <input type="date" id="f-kpi-fecha-desde" class="form-control-5s" onchange="renderizarDashboardKpiAcciones()" style="border-radius:8px;">
+        </div>
+        <div class="filtro-grupo">
+          <label style="font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; display:block;">Fecha Hasta</label>
+          <input type="date" id="f-kpi-fecha-hasta" class="form-control-5s" onchange="renderizarDashboardKpiAcciones()" style="border-radius:8px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs Principales de Rendimiento -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:18px;">
+      <div class="kpi-card" style="padding:14px; text-align:center; border:1px solid #a7f3d0; border-radius:12px; background:#fff;">
+        <div class="valor" id="kpi-tasa-cumplimiento" style="color:#10b981; font-size:28px; font-weight:900;">0%</div>
+        <div class="etiqueta" style="font-size:11px; font-weight:800; color:#047857; letter-spacing:.5px; text-transform:uppercase;">% CUMPLIMIENTO</div>
+      </div>
+      <div class="kpi-card" style="padding:14px; text-align:center; border:1px solid #fecaca; border-radius:12px; background:#fff;">
+        <div class="valor" id="kpi-total-retrasadas" style="color:#ef4444; font-size:28px; font-weight:900;">0</div>
+        <div class="etiqueta" style="font-size:11px; font-weight:800; color:#b91c1c; letter-spacing:.5px; text-transform:uppercase;">RETRASADAS</div>
+      </div>
+      <div class="kpi-card" style="padding:14px; text-align:center; border:1px solid #fed7aa; border-radius:12px; background:#fff;">
+        <div class="valor" id="kpi-total-pendientes" style="color:#f59e0b; font-size:28px; font-weight:900;">0</div>
+        <div class="etiqueta" style="font-size:11px; font-weight:800; color:#b45309; letter-spacing:.5px; text-transform:uppercase;">ACCIONES PENDIENTES</div>
+      </div>
+      <div class="kpi-card" style="padding:14px; text-align:center; border:1px solid #e2e8f0; border-radius:12px; background:#fff;">
+        <div class="valor" id="kpi-total-cerradas" style="color:#475569; font-size:28px; font-weight:900;">0</div>
+        <div class="etiqueta" style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.5px; text-transform:uppercase;">ACCIONES CERRADAS</div>
+      </div>
+      <div class="kpi-card" style="padding:14px; text-align:center; border:1px solid #bfdbfe; border-radius:12px; background:#fff;">
+        <div class="valor" id="kpi-total-acciones" style="color:#2563eb; font-size:28px; font-weight:900;">0</div>
+        <div class="etiqueta" style="font-size:11px; font-weight:800; color:#1d4ed8; letter-spacing:.5px; text-transform:uppercase;">TOTAL ACCIONES</div>
+      </div>
+    </div>
+
+    <!-- Gráfica: Territorios con Más Acciones -->
+    <div class="card-5s" style="margin-bottom:16px;">
+      <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="margin:0; font-size:14px; font-weight:800;">🏢 Territorios con Más Acciones</h3>
+          <span class="muted" style="font-size:11px;">Ranking de volumen por territorio</span>
+        </div>
+      </div>
+      <div class="card-body" style="height:340px; position:relative;">
+        <canvas id="graficaKpiTerritorios"></canvas>
+      </div>
+    </div>
+
+    <!-- Tabla Resumen Ejecutivo por Territorio -->
+    <div class="card-5s" style="padding:0; overflow:hidden; margin-bottom:20px;">
+      <div style="padding:14px 16px; border-bottom:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 style="margin:0; font-size:14px; font-weight:800; color:#1e293b;">📋 Tabla de Desempeño por Territorio</h3>
+          <span style="font-size:11.5px; color:var(--texto-muted);">Cumplimiento y acciones pendientes por zona</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="tabla-baul-etos" id="tabla-kpi-territorios">
+          <thead>
+            <tr>
+              <th>Territorio</th>
+              <th style="text-align:center;">Total Acciones</th>
+              <th style="text-align:center;">Cerradas</th>
+              <th style="text-align:center;">En Progreso</th>
+              <th style="text-align:center;">Retrasadas</th>
+              <th style="text-align:center;">% Cumplimiento</th>
+              <th style="text-align:center;">Estatus</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-kpi-territorios">
+            <tr><td colspan="7" style="text-align:center; padding:20px;">Cargando métricas...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var datosKpiBaulGlobal = [];
+  var chartKpiTerritorios = null;
+
+  function cargarVistaKpiBaul() {
+    if (typeof datosBaulGlobal !== 'undefined' && datosBaulGlobal.length > 0) {
+      datosKpiBaulGlobal = datosBaulGlobal;
+      llenarFiltrosKpi();
+      renderizarDashboardKpiAcciones();
+    } else {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.datos) {
+            datosKpiBaulGlobal = res.datos;
+            if (typeof datosBaulGlobal !== 'undefined') datosBaulGlobal = res.datos;
+            llenarFiltrosKpi();
+            renderizarDashboardKpiAcciones();
+          }
+        })
+        .obtenerDatosBaul5S();
+    }
+  }
+
+  function llenarFiltrosKpi() {
+    var selTerr = document.getElementById('f-kpi-territorio');
+    var dlResp  = document.getElementById('lista-f-kpi-responsable');
+    if (!selTerr) return;
+
+    var territorios = {};
+    var responsables = {};
+    datosKpiBaulGlobal.forEach(function(d) {
+      if (d.territorio) territorios[d.territorio] = true;
+      if (d.responsable) responsables[d.responsable] = true;
+    });
+
+    var valorActualTerr = selTerr.value;
+    selTerr.innerHTML = '<option value="">Todos los Territorios</option>';
+    Object.keys(territorios).sort().forEach(function(t) {
+      selTerr.innerHTML += '<option value="' + t + '">' + t + '</option>';
+    });
+    if (valorActualTerr) selTerr.value = valorActualTerr;
+
+    if (dlResp) {
+      dlResp.innerHTML = '';
+      Object.keys(responsables).sort().forEach(function(r) {
+        dlResp.innerHTML += '<option value="' + r + '">';
+      });
+    }
+  }
+
+  function normalizarFechaYmdKpi(fStr) {
+    if (!fStr) return '';
+    var s = String(fStr).trim();
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    var partes = s.split(/[/-]/);
+    if (partes.length === 3) {
+      if (partes[0].length === 4) {
+        return partes[0] + '-' + partes[1].padStart(2, '0') + '-' + partes[2].padStart(2, '0');
+      } else {
+        return partes[2] + '-' + partes[1].padStart(2, '0') + '-' + partes[0].padStart(2, '0');
+      }
+    }
+    return '';
+  }
+
+  function normalizarDateAInputKpi(d) {
+    if (!d) return '';
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
+  function filtrarDiaHabilKpi() {
+    var hoy = new Date();
+    var diaSemana = hoy.getDay();
+    var target = new Date(hoy);
+    if (diaSemana === 0) target.setDate(hoy.getDate() - 2); // Domingo -> Viernes
+    else if (diaSemana === 6) target.setDate(hoy.getDate() - 1); // Sábado -> Viernes
+    else target = hoy; // Lunes a Viernes es HOY
+
+    var ymd = normalizarDateAInputKpi(target);
+    document.getElementById('f-kpi-fecha-desde').value = ymd;
+    document.getElementById('f-kpi-fecha-hasta').value = ymd;
+    renderizarDashboardKpiAcciones();
+    mostrarToast('Filtrado por día hábil: ' + ymd, 'info');
+  }
+
+  function filtrarEstaSemanaKpi() {
+    var hoy = new Date();
+    var diaSemana = hoy.getDay();
+    var diff = (diaSemana === 0 ? -6 : 1) - diaSemana;
+    var primerDia = new Date(hoy);
+    primerDia.setDate(hoy.getDate() + diff);
+
+    document.getElementById('f-kpi-fecha-desde').value = normalizarDateAInputKpi(primerDia);
+    document.getElementById('f-kpi-fecha-hasta').value = normalizarDateAInputKpi(hoy);
+    renderizarDashboardKpiAcciones();
+    mostrarToast('Filtrado por esta semana', 'info');
+  }
+
+  function filtrarEsteMesKpi() {
+    var hoy = new Date();
+    var primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    document.getElementById('f-kpi-fecha-desde').value = normalizarDateAInputKpi(primerDia);
+    document.getElementById('f-kpi-fecha-hasta').value = normalizarDateAInputKpi(hoy);
+    renderizarDashboardKpiAcciones();
+    mostrarToast('Filtrado por este mes', 'info');
+  }
+
+  function limpiarFiltrosKpi() {
+    if (document.getElementById('f-kpi-territorio'))  document.getElementById('f-kpi-territorio').value  = '';
+    if (document.getElementById('f-kpi-responsable')) document.getElementById('f-kpi-responsable').value = '';
+    if (document.getElementById('f-kpi-fecha-desde')) document.getElementById('f-kpi-fecha-desde').value = '';
+    if (document.getElementById('f-kpi-fecha-hasta')) document.getElementById('f-kpi-fecha-hasta').value = '';
+    renderizarDashboardKpiAcciones();
+  }
+
+  function renderizarDashboardKpiAcciones() {
+    var fTerr  = (document.getElementById('f-kpi-territorio')  || {}).value || '';
+    var fResp  = (document.getElementById('f-kpi-responsable') || {}).value || '';
+    var fDesde = (document.getElementById('f-kpi-fecha-desde') || {}).value || '';
+    var fHasta = (document.getElementById('f-kpi-fecha-hasta') || {}).value || '';
+
+    var filtrados = datosKpiBaulGlobal.filter(function(d) {
+      if (fTerr && d.territorio !== fTerr) return false;
+      if (fResp && d.responsable !== fResp) return false;
+      if (fDesde || fHasta) {
+        var fItem = normalizarFechaYmdKpi(d.fechaCreacion) || normalizarFechaYmdKpi(d.fechaCompromiso);
+        if (fItem) {
+          if (fDesde && fItem < fDesde) return false;
+          if (fHasta && fItem > fHasta) return false;
+        }
+      }
+      return true;
+    });
+
+    // ── Métricas Principales ──
+    var total = filtrados.length;
+    var cerradas = 0;
+    var retrasadas = 0;
+    var progreso = 0;
+    var porValidar = 0;
+
+    var porTerr = {};
+    var porResp = {};
+
+    filtrados.forEach(function(d) {
+      var t = d.territorio || 'General';
+      var r = d.responsable || 'Sin Asignar';
+
+      if (!porTerr[t]) porTerr[t] = { total: 0, cerradas: 0, progreso: 0, retrasadas: 0 };
+      if (!porResp[r]) porResp[r] = { total: 0, cerradas: 0, abiertas: 0 };
+
+      porTerr[t].total++;
+      porResp[r].total++;
+
+      if (d.estado === 'CERRADAS') {
+        cerradas++;
+        porTerr[t].cerradas++;
+        porResp[r].cerradas++;
+      } else if (d.estado === 'RETRASADAS') {
+        retrasadas++;
+        porTerr[t].retrasadas++;
+        porResp[r].abiertas++;
+      } else if (d.estado === 'PENDIENTE VALIDACIÓN') {
+        porValidar++;
+        porTerr[t].progreso++;
+        porResp[r].abiertas++;
+      } else {
+        progreso++;
+        porTerr[t].progreso++;
+        porResp[r].abiertas++;
+      }
+    });
+
+    var pendientesTotal = progreso + porValidar;
+    var pctCumplimiento = total > 0 ? Math.round((cerradas / total) * 100) : 0;
+
+    if (document.getElementById('kpi-tasa-cumplimiento'))   document.getElementById('kpi-tasa-cumplimiento').textContent   = pctCumplimiento + '%';
+    if (document.getElementById('kpi-total-retrasadas'))    document.getElementById('kpi-total-retrasadas').textContent    = retrasadas;
+    if (document.getElementById('kpi-total-pendientes'))    document.getElementById('kpi-total-pendientes').textContent    = pendientesTotal;
+    if (document.getElementById('kpi-total-cerradas'))      document.getElementById('kpi-total-cerradas').textContent      = cerradas;
+    if (document.getElementById('kpi-total-acciones'))      document.getElementById('kpi-total-acciones').textContent      = total;
+
+    // ── 1. Gráfica Territorios con Más Acciones (Horizontal Bar Moderna) ──
+    var terrOrdenados = Object.keys(porTerr).sort(function(a,b) { return porTerr[b].total - porTerr[a].total; }).slice(0, 10);
+    var labelsTerr = terrOrdenados;
+    var dataTerrCerradas = terrOrdenados.map(function(k) { return porTerr[k].cerradas; });
+    var dataTerrProgreso = terrOrdenados.map(function(k) { return porTerr[k].progreso; });
+    var dataTerrRetraso  = terrOrdenados.map(function(k) { return porTerr[k].retrasadas; });
+
+    var ctxTerr = document.getElementById('graficaKpiTerritorios');
+    if (ctxTerr) {
+      if (chartKpiTerritorios) chartKpiTerritorios.destroy();
+      chartKpiTerritorios = new Chart(ctxTerr.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: labelsTerr,
+          datasets: [
+            { label: 'Cerradas', data: dataTerrCerradas, backgroundColor: '#10b981', borderRadius: 6 },
+            { label: 'En Progreso', data: dataTerrProgreso, backgroundColor: '#f59e0b', borderRadius: 6 },
+            { label: 'Retrasadas', data: dataTerrRetraso, backgroundColor: '#ef4444', borderRadius: 6 }
+          ]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 11, weight: '600' } }
+            },
+            tooltip: {
+              backgroundColor: '#0f172a',
+              titleFont: { weight: 'bold' },
+              padding: 10,
+              cornerRadius: 8
+            }
+          },
+          scales: {
+            x: {
+              stacked: true,
+              beginAtZero: true,
+              grid: { color: 'rgba(226, 232, 240, 0.6)' },
+              ticks: { font: { size: 11, weight: '600' } }
+            },
+            y: {
+              stacked: true,
+              grid: { display: false },
+              ticks: { font: { size: 11.5, weight: '700' }, color: '#334155' }
+            }
+          }
+        }
+      });
+    }
+
+
+    // ── 5. Tabla Resumen por Territorio ──
+    var tbody = document.getElementById('tbody-kpi-territorios');
+    if (tbody) {
+      var allTerrs = Object.keys(porTerr).sort(function(a,b) { return porTerr[b].total - porTerr[a].total; });
+      if (allTerrs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:18px; color:#64748b;">No hay acciones para los filtros seleccionados.</td></tr>';
+      } else {
+        var htmlTb = '';
+        allTerrs.forEach(function(t) {
+          var item = porTerr[t];
+          var pct = item.total > 0 ? Math.round((item.cerradas / item.total) * 100) : 0;
+          var semaforo = pct >= 80 ? '🟢 Alto' : (pct >= 50 ? '🟡 Regular' : '🔴 Crítico');
+          var colorPct = pct >= 80 ? '#047857' : (pct >= 50 ? '#b45309' : '#b91c1c');
+
+          htmlTb += '<tr>'
+                 +    '<td style="font-weight:700; color:#1e293b;">' + t + '</td>'
+                 +    '<td style="text-align:center; font-weight:800;">' + item.total + '</td>'
+                 +    '<td style="text-align:center; color:#10b981; font-weight:700;">' + item.cerradas + '</td>'
+                 +    '<td style="text-align:center; color:#f59e0b; font-weight:700;">' + item.progreso + '</td>'
+                 +    '<td style="text-align:center; color:#ef4444; font-weight:700;">' + item.retrasadas + '</td>'
+                 +    '<td style="text-align:center; font-weight:800; color:' + colorPct + ';">' + pct + '%</td>'
+                 +    '<td style="text-align:center; font-size:11.5px; font-weight:700;">' + semaforo + '</td>'
+                 +  '</tr>';
+        });
+        tbody.innerHTML = htmlTb;
+      }
+    }
+  }
+</script>

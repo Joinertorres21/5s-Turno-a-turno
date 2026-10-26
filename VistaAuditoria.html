@@ -1,0 +1,707 @@
+<!-- VistaAuditoria.html — Formulario de auditoría 5S turno a turno optimizado para móviles -->
+<div id="vista-auditoria" class="vista">
+  <div class="contenedor aud-contenedor-mobile">
+
+    <!-- Header contextual -->
+    <div class="audit-header card-5s" style="padding:16px; margin-bottom:16px; border-left: 4px solid var(--verde);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h2 style="font-size:18px; font-weight:800; margin:0; display:flex; align-items:center; gap:8px;">
+            <span>📋</span> Auditoría 5S Preturno
+          </h2>
+          <p style="font-size:12px; color:var(--texto-muted); margin:4px 0 0 0;">
+            Validación al recibir el turno. Todo hallazgo generará automáticamente una acción correctiva que debe cerrarse antes de finalizar el turno.
+          </p>
+        </div>
+        <div id="audit-score-pill" style="display:none; text-align:center; background:var(--gris-bg); padding:6px 14px; border-radius:24px; border:1px solid var(--gris-borde);">
+          <div style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--texto-muted);">Cumplimiento</div>
+          <div id="audit-live-pct" style="font-size:20px; font-weight:800; color:var(--verde);">100%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Paso 1: Contexto de Turno -->
+    <div id="paso-contexto">
+      <div class="card-5s" style="margin-bottom:16px;">
+        <div class="card-header" style="padding:14px 16px;">
+          <h3 style="font-size:15px; margin:0;">1. Datos del Turno y Territorio</h3>
+        </div>
+        <div class="card-body" style="padding:16px;">
+          <div class="form-grid-mobile">
+            
+            <!-- Territorio -->
+            <div class="form-group">
+              <label style="font-size:13px; font-weight:700;">Territorio de Trabajo *</label>
+              <select id="aud-territorio" class="form-control-5s" required onchange="onTerritorioCambia()">
+                <option value="">Cargando territorios...</option>
+              </select>
+            </div>
+
+            <!-- Turno -->
+            <div class="form-group">
+              <label style="font-size:13px; font-weight:700;">Turno *</label>
+              <select id="aud-turno" class="form-control-5s" required>
+                <option value="">Seleccione Turno...</option>
+                <option value="A">Turno A (06:00 – 14:00)</option>
+                <option value="B">Turno B (14:00 – 22:00)</option>
+                <option value="C">Turno C (22:00 – 06:00)</option>
+              </select>
+            </div>
+
+            <!-- Auditor (Tomado de la hoja Auditores) -->
+            <div class="form-group" style="position:relative;">
+              <label style="font-size:13px; font-weight:700;">Auditor Easy *</label>
+              <input type="text" id="aud-auditado-por" class="form-control-5s" placeholder="Escriba o seleccione Auditor..." required autocomplete="off" onfocus="mostrarOpcionesAuditor()" oninput="filtrarOpcionesAuditor()" onblur="ocultarOpcionesAuditor()">
+              <div id="dropdown-auditores" class="custom-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:#fff; border:1px solid var(--gris-borde); border-radius:var(--radius-sm); box-shadow:var(--shadow); z-index:100;"></div>
+            </div>
+
+            <!-- Fecha -->
+            <div class="form-group">
+              <label style="font-size:13px; font-weight:700;">Fecha de Auditoría *</label>
+              <input type="date" id="aud-fecha" class="form-control-5s" required>
+            </div>
+
+          </div>
+
+          <!-- Info automática del territorio -->
+          <div id="info-territorio" style="display:none; margin-top:14px; padding:12px 14px; background:rgba(16,185,129,0.08); border-radius:10px; border:1px solid rgba(16,185,129,0.25);">
+            <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px;">
+              <div><span style="color:var(--texto-muted); font-size:10px; font-weight:800; text-transform:uppercase;">Hashtag:</span> <strong id="info-hashtag" style="color:var(--verde-dark);">—</strong></div>
+              <div><span style="color:var(--texto-muted); font-size:10px; font-weight:800; text-transform:uppercase;">Dueño Territorio:</span> <strong id="info-dueno-abi">—</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:right;">
+        <button class="btn btn-verde btn-lg-mobile" onclick="irAlChecklist()" style="display:inline-flex; align-items:center; gap:8px;">
+          <span>Ir a las Preguntas</span> <span>→</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Paso 2: Checklist 28 Preguntas -->
+    <div id="paso-checklist" style="display:none;">
+      
+      <!-- Barra flotante de progreso y alerta móvil -->
+      <div id="barra-progreso-checklist" class="sticky-progress-5s">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span style="font-size:12px; font-weight:700;" id="txt-progreso-respuestas">0 de 28 respondidas</span>
+          <span style="font-size:13px; font-weight:800;" id="txt-progreso-score">Cumplimiento: 100%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+        </div>
+        <div id="aviso-menor-80" style="display:none; margin-top:6px; font-size:11.5px; color:#ef4444; font-weight:700; background:#fef2f2; padding:4px 8px; border-radius:6px; border:1px solid #fee2e2;">
+          ⚠️ Cumplimiento &lt; 80%. Será obligatorio registrar acción en el Baúl al terminar el turno.
+        </div>
+      </div>
+
+      <div id="contenedor-preguntas">
+        <div class="cargando"><div class="spinner"></div><br>Cargando preguntas de auditoría...</div>
+      </div>
+
+      <!-- Barra de acciones inferior -->
+      <div class="barra-acciones-mobile">
+        <button class="btn btn-ghost" onclick="volverAlContexto()" style="border:1px solid var(--gris-borde);">
+          ← Volver
+        </button>
+        <button class="btn btn-verde btn-lg-mobile" id="btn-guardar-auditoria" onclick="prepararGuardadoAuditoria()">
+          💾 Guardar Auditoría
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal obligatorio si score < 80% -->
+    <div id="modal-entrega-turno" class="modal-5s" style="display:none;">
+      <div class="modal-5s-backdrop" onclick="cerrarModalEntrega()"></div>
+      <div class="modal-5s-contenido">
+        <div style="background:#fee2e2; border-bottom:1px solid #fecaca; padding:14px 18px; border-radius:12px 12px 0 0;">
+          <h3 style="margin:0; font-size:16px; color:#991b1b; font-weight:800; display:flex; align-items:center; gap:8px;">
+            <span>🚨</span> Acción Obligatoria de Fin de Turno (&lt; 80%)
+          </h3>
+          <p style="margin:4px 0 0 0; font-size:12px; color:#b91c1c;">
+            El territorio obtuvo <strong id="modal-score-alert">0%</strong>. Es obligatorio comprometer una acción en el Baúl para entregar al siguiente turno.
+          </p>
+        </div>
+        <div style="padding:16px;">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:12.5px; font-weight:700;">Acción Correctiva a ejecutar antes de entregar el turno *</label>
+            <textarea id="entrega-descripcion" rows="3" class="form-control-5s" placeholder="Ej: Realizar despeje y clasificación de cajas en zona norte antes de las 14:00..." required></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:12.5px; font-weight:700;">Responsable de ejecutar la acción *</label>
+            <input list="lista-entrega-responsable" id="entrega-responsable" class="form-control-5s" placeholder="Escriba o seleccione Responsable..." required>
+            <datalist id="lista-entrega-responsable"></datalist>
+          </div>
+          <div class="form-group" style="margin-bottom:16px;">
+            <label style="font-size:12.5px; font-weight:700;">Dueño del Territorio</label>
+            <input type="text" id="entrega-dueno" class="form-control-5s" readonly style="background:var(--gris-bg);">
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button type="button" class="btn btn-ghost" onclick="cerrarModalEntrega()">Cancelar</button>
+            <button type="button" class="btn btn-rojo" id="btn-confirmar-entrega" onclick="confirmarGuardadoConEntrega()">
+              ✅ Registrar Acción y Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pantalla de Resultado Exitoso -->
+    <div id="resultado-auditoria" class="card-5s" style="display:none; margin-top:20px; text-align:center; padding:28px 16px;">
+      <div id="resultado-icono" style="font-size:52px; line-height:1; margin-bottom:10px;">🎉</div>
+      <div class="pct" id="resultado-pct" style="font-size:42px; font-weight:900; color:var(--verde);">100%</div>
+      <h3 id="resultado-titulo" style="font-size:18px; margin:10px 0 6px 0;">Auditoría Registrada</h3>
+      <p id="resultado-msg" style="font-size:13.5px; color:var(--texto-muted); max-width:500px; margin:0 auto 20px auto;">
+        Auditoría guardada con éxito.
+      </p>
+
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn btn-verde btn-lg-mobile" onclick="nuevaAuditoria()">
+          + Nueva Auditoría
+        </button>
+        <button class="btn btn-naranja btn-lg-mobile" onclick="cambiarVista('baul')">
+          📦 Ver Baúl de Acciones
+        </button>
+        <button class="btn btn-azul btn-lg-mobile" onclick="cambiarVista('dashboard')">
+          📊 Ir al Dashboard
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var configTerritoriosGlobal = [];
+  var listaAuditoresGlobal    = [];
+  var preguntasGlobal         = [];
+  var respuestasMap           = {};
+  var listasBaulAuditoria     = null;
+
+  // ── Cargar configuración inicial ─────────────────────────────
+  function cargarVistaAuditoria() {
+    // Fecha de hoy por defecto en zona horaria local
+    var hoy = new Date();
+    var yyyy = hoy.getFullYear();
+    var mm   = String(hoy.getMonth() + 1).padStart(2, '0');
+    var dd   = String(hoy.getDate()).padStart(2, '0');
+    document.getElementById('aud-fecha').value = yyyy + '-' + mm + '-' + dd;
+
+    // Cargar territorios y auditores si no se han cargado
+    if (configTerritoriosGlobal.length === 0 || listaAuditoresGlobal.length === 0) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res.error) return mostrarToast('Error: ' + res.error, 'error');
+          configTerritoriosGlobal = res.territorios || [];
+          listaAuditoresGlobal    = res.auditores || [];
+
+          // 1. Poblar territorios
+          var selTerr = document.getElementById('aud-territorio');
+          selTerr.innerHTML = '<option value="">Seleccione Territorio...</option>';
+          configTerritoriosGlobal.forEach(function(t) {
+            selTerr.add(new Option(t.nombre, t.nombre));
+          });
+
+          // 2. Guardar auditores en memoria (la UI personalizada lo usa)
+          // No necesitamos inyectar en datalist, usamos listaAuditoresGlobal
+        })
+        .getConfigTerritorios();
+    }
+
+    // Cargar listas del baúl para opciones de entrega de turno
+    if (!listasBaulAuditoria) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && !res.error) {
+            listasBaulAuditoria = res;
+            var dlResp = document.getElementById('lista-entrega-responsable');
+            if (dlResp && res.responsables) {
+              dlResp.innerHTML = '';
+              res.responsables.forEach(function(r) { dlResp.appendChild(new Option(r)); });
+            }
+          }
+        })
+        .obtenerListasBaul5S();
+    }
+
+    // Reset de vistas de pasos
+    document.getElementById('paso-contexto').style.display   = 'block';
+    document.getElementById('paso-checklist').style.display  = 'none';
+    document.getElementById('resultado-auditoria').style.display = 'none';
+    document.getElementById('audit-score-pill').style.display = 'none';
+  }
+
+  function onTerritorioCambia() {
+    var nombre = document.getElementById('aud-territorio').value;
+    var t = configTerritoriosGlobal.find(function(x) { return x.nombre === nombre; });
+    var div = document.getElementById('info-territorio');
+    if (t) {
+      document.getElementById('info-hashtag').textContent   = t.hashtag || '—';
+      document.getElementById('info-dueno-abi').textContent = t.duenoBi  || '—';
+      div.style.display = 'block';
+    } else {
+      div.style.display = 'none';
+    }
+  }
+
+  function irAlChecklist() {
+    var territorio = document.getElementById('aud-territorio').value;
+    var turno      = document.getElementById('aud-turno').value;
+    var auditor    = document.getElementById('aud-auditado-por').value;
+    var fecha      = document.getElementById('aud-fecha').value;
+
+    if (!territorio || !turno || !auditor || !fecha) {
+      mostrarToast('Por favor completa todos los campos del turno.', 'error');
+      return;
+    }
+
+    // Función para normalizar texto (sin tildes, minúsculas, espacios limpios)
+    function normalizarTexto(txt) {
+      return String(txt || '').toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    var normAuditor = normalizarTexto(auditor);
+    var auditorEncontrado = listaAuditoresGlobal.find(function(a) {
+      return normalizarTexto(a) === normAuditor;
+    });
+
+    if (!auditorEncontrado) {
+      mostrarToast('El Auditor Easy debe coincidir con un nombre de la lista (puedes escribir para filtrar).', 'error');
+      return;
+    }
+
+    // Asegurar el nombre con el formato exacto del catálogo
+    document.getElementById('aud-auditado-por').value = auditorEncontrado;
+
+    // Verificar si ya existe auditoría para este turno/fecha
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.existe) {
+          if (!confirm('⚠️ Ya existe una auditoría para ' + territorio + ' | Turno ' + turno + ' | Fecha ' + fecha + '.\n¿Deseas registrar otra evaluación?')) {
+            return;
+          }
+        }
+        mostrarChecklist();
+      })
+      .verificarDuplicadoAuditoria(territorio, turno, fecha);
+  }
+
+  // ── Lógica de Autocompletado Custom (Auditor Easy) ─────────────
+  function normalizarTextoAuditor(txt) {
+    return String(txt || '').toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function mostrarOpcionesAuditor() {
+    renderOpcionesAuditor(listaAuditoresGlobal);
+    document.getElementById('dropdown-auditores').style.display = 'block';
+  }
+
+  function filtrarOpcionesAuditor() {
+    var val = normalizarTextoAuditor(document.getElementById('aud-auditado-por').value);
+    var filtrados = listaAuditoresGlobal.filter(function(a) { 
+      return normalizarTextoAuditor(a).indexOf(val) > -1; 
+    });
+    renderOpcionesAuditor(filtrados);
+    document.getElementById('dropdown-auditores').style.display = 'block';
+  }
+
+  function renderOpcionesAuditor(lista) {
+    var div = document.getElementById('dropdown-auditores');
+    div.innerHTML = '';
+    if (lista.length === 0) {
+      div.innerHTML = '<div style="padding:10px; color:#999; font-size:13px;">No hay coincidencias</div>';
+      return;
+    }
+    lista.forEach(function(a) {
+      var item = document.createElement('div');
+      item.textContent = a;
+      item.style.padding = '10px 12px';
+      item.style.fontSize = '14px';
+      item.style.cursor = 'pointer';
+      item.style.borderBottom = '1px solid #f1f5f9';
+
+      function seleccionarOpcion(e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        document.getElementById('aud-auditado-por').value = a;
+        document.getElementById('dropdown-auditores').style.display = 'none';
+      }
+
+      item.onpointerdown = seleccionarOpcion;
+      item.onmousedown   = seleccionarOpcion;
+      item.ontouchstart  = seleccionarOpcion;
+      item.onmouseover   = function() { item.style.background = '#f8fafc'; };
+      item.onmouseout    = function() { item.style.background = 'transparent'; };
+      div.appendChild(item);
+    });
+  }
+
+  function ocultarOpcionesAuditor() {
+    setTimeout(function() {
+      var dropdown = document.getElementById('dropdown-auditores');
+      if (dropdown) dropdown.style.display = 'none';
+    }, 200);
+  }
+
+
+  function mostrarChecklist() {
+    document.getElementById('paso-contexto').style.display  = 'none';
+    document.getElementById('paso-checklist').style.display = 'block';
+    document.getElementById('audit-score-pill').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (preguntasGlobal.length > 0) {
+      renderChecklist(preguntasGlobal);
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.error) {
+          document.getElementById('contenedor-preguntas').innerHTML =
+            '<p style="color:#ef4444; padding:16px;">Error cargando preguntas: ' + res.error + '</p>';
+          return;
+        }
+        preguntasGlobal = res.preguntas || [];
+        renderChecklist(preguntasGlobal);
+      })
+      .getPreguntas5S();
+  }
+
+  function renderChecklist(preguntas) {
+    var categorias = {};
+    preguntas.forEach(function(p) {
+      if (!categorias[p.categoria]) categorias[p.categoria] = [];
+      categorias[p.categoria].push(p);
+    });
+
+    var html = '';
+    Object.keys(categorias).forEach(function(cat) {
+      html += '<div class="categoria-header-5s">'
+           +    '<h4>' + cat + '</h4>'
+           +  '</div>';
+
+      categorias[cat].forEach(function(p) {
+        var respActual = respuestasMap[p.orden] || '';
+        var esSi = respActual === 'Si';
+        var esNo = respActual === 'No';
+
+        html += '<div class="pregunta-card-mobile" id="item_' + p.orden + '">'
+             +    '<div class="pregunta-num">#' + p.orden + '</div>'
+             +    '<p class="pregunta-texto">' + p.pregunta + '</p>'
+             +    '<div class="btn-group-respuestas-mobile">'
+             +      '<button type="button" class="btn-resp-tap btn-resp-si ' + (esSi ? 'seleccionado' : '') + '" id="btn-si-' + p.orden + '" onclick="marcarRespuesta(' + p.orden + ', \'Si\')">'
+             +        '✅ Sí'
+             +      '</button>'
+             +      '<button type="button" class="btn-resp-tap btn-resp-no ' + (esNo ? 'seleccionado' : '') + '" id="btn-no-' + p.orden + '" onclick="marcarRespuesta(' + p.orden + ', \'No\')">'
+             +        '❌ No'
+             +      '</button>'
+             +    '</div>'
+             +    '<div class="hallazgo-box ' + (esNo ? 'visible' : '') + '" id="hallazgo_' + p.orden + '">'
+             +      '<div style="background:#fee2e2; border-left:4px solid #ef4444; padding:8px 12px; border-radius:6px; margin-bottom:10px;">'
++        '<div style="font-size:13px; font-weight:900; color:#991b1b; display:flex; align-items:center; gap:6px;"><span>📦</span> Baúl de Acciones — Registro de Acción Correctiva</div>'
++        '<div style="font-size:11px; color:#7f1d1d; margin-top:3px; line-height:1.4;">Es necesario dejar una acción para corregir la novedad. Deberá cerrarse <strong>antes de finalizar el turno</strong>.</div>'
++        '<div style="font-size:10.5px; color:#065f46; background:rgba(16,185,129,0.12); padding:3px 8px; border-radius:4px; margin-top:5px; font-weight:700; display:inline-block;">⭐ Excelencia Operacional: La disciplina en el registro oportuno garantiza la resolución de novedades en piso.</div>'
++      '</div>'
++      '<label style="font-size:11.5px; font-weight:700; color:#b91c1c; margin-bottom:4px; display:block;">Detalle del hallazgo (Novedad):</label>'
+             +      '<textarea class="form-control-5s" rows="2" placeholder="Describe brevemente la anomalía..." id="txt_' + p.orden + '"></textarea>'
+             +      '<label style="font-size:11.5px; font-weight:700; color:#b91c1c; margin-top:8px; margin-bottom:4px; display:block;">Acción a realizar:</label>'
+             +      '<textarea class="form-control-5s" rows="2" placeholder="Describe la acción a ejecutar..." id="accion_' + p.orden + '"></textarea>'
+             +      '<label style="font-size:11.5px; font-weight:700; color:#b91c1c; margin-top:8px; margin-bottom:4px; display:block;">Encargado / Responsable:</label>'
+             +      '<input list="lista-entrega-responsable" class="form-control-5s" placeholder="Escriba o seleccione..." id="encargado_' + p.orden + '">'
+             +    '</div>'
+             +  '</div>';
+      });
+    });
+
+    document.getElementById('contenedor-preguntas').innerHTML = html;
+    actualizarProgresoChecklist();
+  }
+
+  function marcarRespuesta(orden, valor) {
+    respuestasMap[orden] = valor;
+    
+    var btnSi = document.getElementById('btn-si-' + orden);
+    var btnNo = document.getElementById('btn-no-' + orden);
+    var boxHallazgo = document.getElementById('hallazgo_' + orden);
+
+    if (btnSi) btnSi.classList.toggle('seleccionado', valor === 'Si');
+    if (btnNo) btnNo.classList.toggle('seleccionado', valor === 'No');
+    if (boxHallazgo) boxHallazgo.classList.toggle('visible', valor === 'No');
+
+    actualizarProgresoChecklist();
+  }
+
+  function calcularPorcentajeActual() {
+    var respondidas = Object.keys(respuestasMap);
+    if (respondidas.length === 0) return 100;
+    var totalSi = respondidas.filter(function(k) { return respuestasMap[k] === 'Si'; }).length;
+    var totalTotal = preguntasGlobal.length || 28;
+    return Math.round((totalSi / totalTotal) * 100);
+  }
+
+  function actualizarProgresoChecklist() {
+    var respondidas = Object.keys(respuestasMap).length;
+    var total = preguntasGlobal.length || 28;
+    var pctRespuestas = Math.round((respondidas / total) * 100);
+
+    var score = calcularPorcentajeActual();
+
+    document.getElementById('txt-progreso-respuestas').textContent = respondidas + ' de ' + total + ' respondidas';
+    document.getElementById('txt-progreso-score').textContent = 'Cumplimiento: ' + score + '%';
+    
+    var barFill = document.getElementById('progress-bar-fill');
+    if (barFill) {
+      barFill.style.width = pctRespuestas + '%';
+      barFill.style.backgroundColor = score >= 80 ? 'var(--verde)' : '#ef4444';
+    }
+
+    var livePct = document.getElementById('audit-live-pct');
+    if (livePct) {
+      livePct.textContent = score + '%';
+      livePct.style.color = score >= 80 ? 'var(--verde)' : '#ef4444';
+    }
+
+    var aviso80 = document.getElementById('aviso-menor-80');
+    if (aviso80) {
+      aviso80.style.display = (score < 80) ? 'block' : 'none';
+    }
+  }
+
+  function volverAlContexto() {
+    document.getElementById('paso-contexto').style.display  = 'block';
+    document.getElementById('paso-checklist').style.display = 'none';
+    document.getElementById('audit-score-pill').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Verificación y Guardado ──────────────────────────────────
+  function prepararGuardadoAuditoria() {
+    var respondidas = Object.keys(respuestasMap).length;
+    var total = preguntasGlobal.length || 28;
+
+    if (respondidas < total) {
+      var faltantes = total - respondidas;
+      mostrarToast('Debes responder todas las ' + total + ' preguntas (' + faltantes + ' pendiente' + (faltantes > 1 ? 's' : '') + ').', 'error');
+      var primeraSinResp = (preguntasGlobal.length > 0 ? preguntasGlobal : PREGUNTAS_5S_OFICIALES).find(function(p) {
+        return !respuestasMap[p.orden];
+      });
+      if (primeraSinResp) {
+        var elPreg = document.getElementById('btn-si-' + primeraSinResp.orden);
+        if (elPreg) elPreg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
+    // Validar que cada "No" tenga Novedad, Acción y Encargado, y que Encargado esté en la lista
+    var noCompletos = true;
+    var encargadoInvalido = false;
+    var validResp = (listasBaulAuditoria && listasBaulAuditoria.responsables) ? listasBaulAuditoria.responsables : [];
+
+    Object.keys(respuestasMap).forEach(function(orden) {
+      if (respuestasMap[orden] === 'No') {
+        var h = (document.getElementById('txt_' + orden) || {}).value || '';
+        var a = (document.getElementById('accion_' + orden) || {}).value || '';
+        var e = (document.getElementById('encargado_' + orden) || {}).value || '';
+        if (!h.trim() || !a.trim() || !e.trim()) {
+          noCompletos = false;
+        } else if (validResp.length > 0 && validResp.indexOf(e) === -1) {
+          encargadoInvalido = true;
+        }
+      }
+    });
+
+    if (!noCompletos) {
+      mostrarToast('Cada respuesta "No" requiere detallar la Novedad, la Acción y el Encargado.', 'error');
+      return;
+    }
+    if (encargadoInvalido) {
+      mostrarToast('El Encargado debe coincidir con un nombre de la lista.', 'error');
+      return;
+    }
+
+    var score = calcularPorcentajeActual();
+
+    // Las acciones de los hallazgos ya están capturadas obligatoriamente en cada pregunta marcada con "No".
+    // Se envía directamente para evitar registrar acciones duplicadas en el Baúl.
+    ejecutarEnvioAuditoria(null);
+  }
+
+  function abrirModalEntrega(score) {
+    document.getElementById('modal-score-alert').textContent = score + '%';
+    
+    var territorio = document.getElementById('aud-territorio').value;
+    var t = configTerritoriosGlobal.find(function(x) { return x.nombre === territorio; }) || {};
+    document.getElementById('entrega-dueno').value = t.duenoBi || 'Sin Asignar';
+    document.getElementById('entrega-descripcion').value = '';
+
+    document.getElementById('modal-entrega-turno').style.display = 'flex';
+  }
+
+  function cerrarModalEntrega() {
+    document.getElementById('modal-entrega-turno').style.display = 'none';
+  }
+
+  function confirmarGuardadoConEntrega() {
+    if (guardandoAuditoriaEnCurso) return;
+
+    var desc = document.getElementById('entrega-descripcion').value.trim();
+    var resp = document.getElementById('entrega-responsable').value;
+    var dueno = document.getElementById('entrega-dueno').value;
+
+    if (!desc) {
+      mostrarToast('Debes ingresar la descripción de la acción de entrega de turno.', 'error');
+      return;
+    }
+    if (!resp) {
+      mostrarToast('Selecciona el responsable de realizar la acción antes de terminar el turno.', 'error');
+      return;
+    }
+    var validResp = (listasBaulAuditoria && listasBaulAuditoria.responsables) ? listasBaulAuditoria.responsables : [];
+    if (validResp.length > 0 && validResp.indexOf(resp) === -1) {
+      mostrarToast('El Responsable debe coincidir con un nombre de la lista.', 'error');
+      return;
+    }
+
+    var accionFinTurno = {
+      descripcion: desc,
+      responsable: resp,
+      dueno: dueno
+    };
+
+    cerrarModalEntrega();
+    ejecutarEnvioAuditoria(accionFinTurno);
+  }
+
+  var guardandoAuditoriaEnCurso = false;
+
+  function ejecutarEnvioAuditoria(accionFinTurno) {
+    if (guardandoAuditoriaEnCurso) return;
+    guardandoAuditoriaEnCurso = true;
+
+    var territorio  = document.getElementById('aud-territorio').value;
+    var turno       = document.getElementById('aud-turno').value;
+    var auditor     = document.getElementById('aud-auditado-por').value;
+    var fecha       = document.getElementById('aud-fecha').value;
+    var t           = configTerritoriosGlobal.find(function(x) { return x.nombre === territorio; }) || {};
+
+    // Calcular semana Wxx
+    var d = new Date(fecha + 'T00:00:00');
+    d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+    var w1 = new Date(d.getFullYear(), 0, 4);
+    var wn = 1 + Math.round(((d.getTime() - w1.getTime()) / 86400000 - 3 + (w1.getDay() + 6) % 7) / 7);
+    var semana = 'W' + (wn < 10 ? '0' + wn : wn);
+
+    var respuestas = (preguntasGlobal.length > 0 ? preguntasGlobal : PREGUNTAS_5S_OFICIALES).map(function(p) {
+      return {
+        categoria: p.categoria,
+        pregunta:  p.pregunta,
+        orden:     p.orden,
+        respuesta: respuestasMap[p.orden] || 'Si',
+        hallazgo:  (document.getElementById('txt_' + p.orden) || {}).value || '',
+        accion:    (document.getElementById('accion_' + p.orden) || {}).value || '',
+        encargado: (document.getElementById('encargado_' + p.orden) || {}).value || ''
+      };
+    });
+
+    var payload = {
+      territorio:     territorio,
+      hashtag:        t.hashtag || '',
+      turno:          turno,
+      auditadoPor:    auditor,
+      duenoBi:        t.duenoBi || '',
+      duenOol:        t.duenOol || '',
+      fecha:          fecha,
+      semana:         semana,
+      respuestas:     respuestas,
+      accionFinTurno: accionFinTurno
+    };
+
+    var btn = document.getElementById('btn-guardar-auditoria');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Guardando auditoría...';
+    }
+    var btnModal = document.getElementById('btn-confirmar-entrega');
+    if (btnModal) {
+      btnModal.disabled = true;
+      btnModal.textContent = 'Guardando...';
+    }
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        guardandoAuditoriaEnCurso = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '💾 Guardar Auditoría';
+        }
+        if (btnModal) {
+          btnModal.disabled = false;
+          btnModal.textContent = '✅ Registrar Acción y Guardar';
+        }
+
+        if (res.error) {
+          mostrarToast('Error al guardar: ' + res.error, 'error');
+          return;
+        }
+
+        // Pantalla de confirmación
+        document.getElementById('paso-checklist').style.display = 'none';
+        document.getElementById('audit-score-pill').style.display = 'none';
+        
+        var divRes = document.getElementById('resultado-auditoria');
+        divRes.style.display = 'block';
+
+        var pctEl = document.getElementById('resultado-pct');
+        pctEl.textContent = res.porcentaje + '%';
+        pctEl.style.color = res.porcentaje >= 80 ? 'var(--verde)' : '#ef4444';
+
+        document.getElementById('resultado-icono').textContent = res.porcentaje >= 80 ? '🎉' : '⚠️';
+        document.getElementById('resultado-titulo').textContent = res.porcentaje >= 80 
+          ? '¡Excelente Turno! Auditoría Aprobada' 
+          : 'Auditoría Registrada con Compromiso de Turno';
+
+        var msg = 'Auditoría guardada con éxito.';
+        if (res.novedades > 0) {
+          msg += ' Acciones registradas: ' + res.novedades + '.';
+        }
+        document.getElementById('resultado-msg').textContent = msg;
+
+        mostrarToast('Auditoría guardada con éxito (' + res.porcentaje + '%)', 'exito');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      })
+      .withFailureHandler(function(err) {
+        guardandoAuditoriaEnCurso = false;
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '💾 Guardar Auditoría';
+        }
+        if (btnModal) {
+          btnModal.disabled = false;
+          btnModal.textContent = '✅ Registrar Acción y Guardar';
+        }
+        mostrarToast('Error de conexión: ' + err.message, 'error');
+      })
+      .guardarAuditoria5S(payload);
+  }
+
+  function nuevaAuditoria() {
+    respuestasMap = {};
+    document.getElementById('resultado-auditoria').style.display = 'none';
+    document.getElementById('paso-contexto').style.display = 'block';
+    document.getElementById('aud-territorio').value = '';
+    document.getElementById('aud-turno').value      = '';
+    document.getElementById('info-territorio').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>

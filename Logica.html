@@ -1,0 +1,1037 @@
+<script>
+  Chart.register(ChartDataLabels);
+
+  let datosGlobales = [];
+  let datosFiltradosGlobales = [];
+  let preguntasGlobales = [];
+  let chartTerr = null;
+  let chartTend = null;
+  let chartAud = null;
+  let chartHall = null;
+
+  const LISTA_OFICIAL_15_TERRITORIOS = [
+    'Almacén de materias primas',
+    'Almacén de repuestos',
+    'Almacén de sustancias químicas',
+    'Almacén/T1',
+    'Báscula',
+    'Centro de acopio',
+    'Cope y Descope',
+    'Cuarto frío',
+    'Maquila',
+    'Oficina',
+    'Parking de montacargas',
+    'Patio de envase',
+    'Reparación de estibas',
+    'Sala de conductores',
+    'Taller de montacargas'
+  ];
+
+  function normalizarClave(txt) {
+    return String(txt || '')
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  function sanitizarTerritorio(nombreRaw) {
+    if (!nombreRaw) return '';
+    const norm = normalizarClave(nombreRaw);
+    if (!norm || norm === 'noaplica' || norm === 'sinasignar' || norm === 'territorio') {
+      return '';
+    }
+    const oficial = LISTA_OFICIAL_15_TERRITORIOS.find(ofic => normalizarClave(ofic) === norm);
+    if (oficial) return oficial;
+    return String(nombreRaw).trim();
+  }
+
+  function obtenerListaTerritorios() {
+    let fuente = [];
+    if (window.territoriosLista && window.territoriosLista.length > 0) {
+      fuente = window.territoriosLista;
+    } else if (window.areas5sGlobales && Object.keys(window.areas5sGlobales).length > 0) {
+      fuente = Object.values(window.areas5sGlobales).map(a => a.territorio);
+    } else if (datosGlobales && datosGlobales.length > 0) {
+      fuente = datosGlobales.map(d => d.territorio);
+    } else {
+      fuente = LISTA_OFICIAL_15_TERRITORIOS;
+    }
+
+    const mapa = new Map();
+    // Priorizar siempre los 15 oficiales
+    LISTA_OFICIAL_15_TERRITORIOS.forEach(t => {
+      mapa.set(normalizarClave(t), t);
+    });
+
+    fuente.forEach(raw => {
+      const limpio = sanitizarTerritorio(raw);
+      if (limpio) {
+        const k = normalizarClave(limpio);
+        if (!mapa.has(k)) {
+          mapa.set(k, limpio);
+        }
+      }
+    });
+
+    return Array.from(mapa.values()).sort((a, b) => a.localeCompare(b));
+  }
+
+  function llenarFiltros(datos) {
+    const selTerritorio = document.getElementById('filtroTerritorio');
+    const selAuditor    = document.getElementById('filtroAuditor');
+    const selDuenoOl    = document.getElementById('filtroDuenoOl');
+    const selDuenoAbi   = document.getElementById('filtroDuenoAbi');
+    const selSemana     = document.getElementById('filtroSemana');
+
+    if (selTerritorio && datos.territorios) {
+      const mapaFiltro = new Map();
+      LISTA_OFICIAL_15_TERRITORIOS.forEach(t => mapaFiltro.set(normalizarClave(t), t));
+      datos.territorios.forEach(raw => {
+        const limpio = sanitizarTerritorio(raw);
+        if (limpio) {
+          const k = normalizarClave(limpio);
+          if (!mapaFiltro.has(k)) mapaFiltro.set(k, limpio);
+        }
+      });
+      const listaFiltro = Array.from(mapaFiltro.values()).sort((a, b) => a.localeCompare(b));
+      window.territoriosLista = listaFiltro;
+      selTerritorio.innerHTML = '<option value="ALL">Todos los Territorios</option>';
+      listaFiltro.forEach(t => selTerritorio.add(new Option(t, t)));
+      if (datosGlobales && datosGlobales.length > 0) {
+        actualizarDashboard();
+      }
+    } else {
+      window.territoriosLista = obtenerListaTerritorios();
+    }
+    if (selAuditor && datos.auditores) {
+      datos.auditores.forEach(a => selAuditor.add(new Option(a, a)));
+    }
+    if (selDuenoOl && datos.duenosOl) {
+      datos.duenosOl.forEach(d => selDuenoOl.add(new Option(d, d)));
+    }
+    if (selDuenoAbi && datos.duenosAbi) {
+      datos.duenosAbi.forEach(d => selDuenoAbi.add(new Option(d, d)));
+    }
+    if (selSemana && datos.semanas && datos.semanas.length > 0) {
+      datos.semanas.forEach(s => {
+        var exists = Array.from(selSemana.options).some(opt => opt.value === s);
+        if (!exists) selSemana.add(new Option(s, s));
+      });
+    }
+  }
+
+  function obtenerSemanaActual(fecha) {
+    var date = fecha ? new Date(fecha) : new Date();
+    if (isNaN(date.getTime())) return 'Desconocida';
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+    var week1 = new Date(date.getFullYear(), 0, 4);
+    var weekNumber = 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+    return 'W' + (weekNumber < 10 ? '0' + weekNumber : weekNumber);
+  }
+
+  function iniciarDatos(datosObj) {
+    datosGlobales = datosObj.registros || [];
+    preguntasGlobales = datosObj.preguntas || [];
+    window.areas5sGlobales = datosObj.areas5s || {};
+
+    if (!window.territoriosLista || window.territoriosLista.length === 0) {
+      window.territoriosLista = obtenerListaTerritorios();
+    }
+    
+    const selSemana = document.getElementById('filtroSemana');
+    const selSemanaMapa = document.getElementById('filtroSemanaMapa');
+    const semanasUnicas = [...new Set(datosGlobales.map(d => d.semana))].filter(Boolean).sort();
+
+    // Determinar la semana en curso (automática)
+    const semanaActual = obtenerSemanaActual();
+    const numActual = parseInt(semanaActual.replace(/\D/g, ''), 10);
+
+    // Buscar si existe en los datos
+    let semanaPorDefecto = semanasUnicas.find(s => {
+      if (s === semanaActual) return true;
+      const numS = parseInt(String(s).replace(/\D/g, ''), 10);
+      return !isNaN(numS) && numS === numActual;
+    });
+
+    const elDia = document.getElementById('fechaFiltro');
+    if (elDia) {
+      // Filtro automático del día de hoy
+      const hoy = new Date();
+      const yyyy = hoy.getFullYear();
+      const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+      const dd = String(hoy.getDate()).padStart(2, '0');
+      elDia.value = `${yyyy}-${mm}-${dd}`;
+    }
+
+    if (selSemana) {
+      selSemana.innerHTML = '<option value="ALL">Todas las Semanas</option>';
+      semanasUnicas.forEach(s => {
+        const esActual = (s === semanaActual || parseInt(String(s).replace(/\D/g, ''), 10) === numActual);
+        const texto = esActual ? s + ' (Semana actual)' : s;
+        selSemana.add(new Option(texto, s));
+      });
+      selSemana.value = 'ALL';
+    }
+
+    if (selSemanaMapa) {
+      selSemanaMapa.innerHTML = '<option value="ALL">Todas las Semanas</option>';
+      semanasUnicas.forEach(s => {
+        const esActual = (s === semanaActual || parseInt(String(s).replace(/\D/g, ''), 10) === numActual);
+        const texto = esActual ? s + ' (Semana actual)' : s;
+        selSemanaMapa.add(new Option(texto, s));
+      });
+      selSemanaMapa.value = 'ALL';
+    }
+
+    actualizarDashboard(); 
+  }
+
+  function actualizarDashboard() {
+    const valDia       = (document.getElementById('fechaFiltro')    || {}).value || '';
+    const valSemana    = (document.getElementById('filtroSemana')   || {}).value || 'ALL';
+    const valTerritorio= (document.getElementById('filtroTerritorio')|| {}).value || 'ALL';
+    const valAuditor   = (document.getElementById('filtroAuditor')  || {}).value || 'ALL';
+    const valDuenoOl   = (document.getElementById('filtroDuenoOl')  || {}).value || 'ALL';
+    const valDuenoAbi  = (document.getElementById('filtroDuenoAbi') || {}).value || 'ALL';
+    const valTurno     = (document.getElementById('filtroTurno')    || {}).value || 'ALL';
+
+    let datosFiltrados = datosGlobales.filter(d => {
+      // Si seleccionó un día específico, filtra por esa fecha.
+      // Si no hay día seleccionado, filtra por la semana.
+      const matchFecha = valDia === "" || d.fecha === valDia;
+      const matchSemana = (valDia !== "") || (valSemana === "ALL" || d.semana === valSemana || d.semanaBase === valSemana);
+      const matchTerr = (valTerritorio === "ALL" || normalizarClave(d.territorio) === normalizarClave(valTerritorio));
+      
+      return matchFecha && matchSemana && matchTerr &&
+             (valAuditor === "ALL" || d.auditor === valAuditor) &&
+             (valDuenoOl === "ALL" || d.duenoOl === valDuenoOl) &&
+             (valDuenoAbi === "ALL" || d.duenoAbi === valDuenoAbi) &&
+             (valTurno === "ALL" || !d.turno || d.turno === valTurno);
+    });
+    datosFiltradosGlobales = datosFiltrados;
+
+    const totalAuditorias  = datosFiltrados.length;
+    const sumaCumplimiento = datosFiltrados.reduce((suma, d) => suma + d.cumplimiento, 0);
+    const promedioGlobal   = totalAuditorias > 0 ? (sumaCumplimiento / totalAuditorias).toFixed(1) : 0;
+    const territoriosUnicos= new Set(datosFiltrados.map(d => sanitizarTerritorio(d.territorio)).filter(Boolean)).size;
+    
+    if (document.getElementById('kpiTotal'))       document.getElementById('kpiTotal').innerText = totalAuditorias;
+    if (document.getElementById('kpiPromedio'))    document.getElementById('kpiPromedio').innerText = promedioGlobal + '%';
+    if (document.getElementById('kpiTerritorios')) document.getElementById('kpiTerritorios').innerText = territoriosUnicos;
+
+    const kpiProm = document.getElementById('kpiPromedio');
+    if (kpiProm) kpiProm.style.color = (parseFloat(promedioGlobal) < 90 && totalAuditorias > 0) ? '#ef4444' : '#10b981';
+
+    // Actualizar Gráficas
+    dibujarGraficaTerritorio(datosFiltrados);
+    dibujarGraficaTendencia(datosFiltrados);
+    if (typeof dibujarGraficaTurnos === 'function') dibujarGraficaTurnos(datosFiltrados);
+    dibujarGraficaHallazgos(datosFiltrados);
+
+    // Nueva matriz de evolución turno a turno
+    dibujarMatrizTurnos(datosFiltrados);
+
+    // Actualizar Mapa Interactivo con porcentajes
+    actualizarMapaTerritorios(datosFiltrados);
+
+    // Sincronizar selector de semana en Mapa
+    const selSemanaMapa = document.getElementById('filtroSemanaMapa');
+    if (selSemanaMapa && selSemanaMapa.value !== valSemana && Array.from(selSemanaMapa.options).some(o => o.value === valSemana)) {
+      selSemanaMapa.value = valSemana;
+    }
+  }
+
+  function dibujarGraficaTerritorio(datos) {
+    const listaOficial = obtenerListaTerritorios();
+    const mapaNormATerr = {};
+
+    const resumen = {};
+    listaOficial.forEach(t => {
+      mapaNormATerr[normalizarClave(t)] = t;
+      resumen[t.trim()] = { suma: 0, cuenta: 0, auditores: new Set() };
+    });
+
+    datos.forEach(d => {
+      const terr = mapaNormATerr[normalizarClave(d.territorio)] || sanitizarTerritorio(d.territorio);
+      if (!terr || !resumen[terr]) return;
+      resumen[terr].suma += d.cumplimiento;
+      resumen[terr].cuenta += 1;
+      if (d.auditor) resumen[terr].auditores.add(d.auditor);
+    });
+
+    let ranking = Object.keys(resumen)
+      .filter(terr => terr && terr.trim() !== '' && terr.toLowerCase() !== 'no aplica' && terr.toLowerCase() !== 'sin asignar')
+      .map(terr => {
+        return {
+          nombre: terr,
+          promedio: resumen[terr].cuenta > 0 ? (resumen[terr].suma / resumen[terr].cuenta).toFixed(1) : 0,
+          auditoresStr: resumen[terr].cuenta > 0 ? Array.from(resumen[terr].auditores).join(", ") : "Sin auditoría"
+        };
+      });
+
+    const tieneDatos = ranking.some(r => parseFloat(r.promedio) > 0);
+    if (tieneDatos) {
+      ranking.sort((a, b) => b.promedio - a.promedio);
+    } else {
+      ranking.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }
+
+    const etiquetas = ranking.map(r => r.nombre);
+    const valores = ranking.map(r => r.promedio);
+    const colores = ranking.map(r => r.auditoresStr === "Sin auditoría" ? '#cbd5e1' : (parseFloat(r.promedio) < 90 ? '#dc3545' : '#198754'));
+    const nombresAuditores = ranking.map(r => r.auditoresStr);
+
+    if(chartTerr) chartTerr.destroy();
+    const ctx = document.getElementById('graficaTerritorio').getContext('2d');
+    chartTerr = new Chart(ctx, {
+      type: 'bar',
+      data: { 
+        labels: etiquetas, 
+        datasets: [{ 
+          label: 'Promedio %', 
+          data: valores, 
+          backgroundColor: colores,
+          auditores: nombresAuditores
+        }] 
+      },
+      options: { 
+        indexAxis: 'y',
+        responsive: true, 
+        maintainAspectRatio: false,
+        scales: { 
+          x: { beginAtZero: true, max: 110 },
+          y: {
+            ticks: {
+              autoSkip: false,
+              font: { size: 11, weight: '700' }
+            }
+          }
+        },
+        plugins: { 
+          datalabels: { anchor: 'end', align: 'right', formatter: (v, ctx) => ctx.dataset.auditores[ctx.dataIndex] === 'Sin auditoría' ? 'S/D' : v + '%', font: { weight: 'bold' } },
+          tooltip: {
+            callbacks: {
+              afterLabel: function(context) {
+                let auditoresInfo = context.dataset.auditores[context.dataIndex];
+                return 'Auditores: ' + auditoresInfo;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  let chartTurnos = null;
+
+  function dibujarGraficaTurnos(datos) {
+    const turnos = ['A', 'B', 'C'];
+    const resumen = { 'A': {suma:0, cuenta:0}, 'B': {suma:0, cuenta:0}, 'C': {suma:0, cuenta:0} };
+    datos.forEach(d => {
+      let t = d.turno || 'A';
+      if (resumen[t]) {
+        resumen[t].suma += d.cumplimiento;
+        resumen[t].cuenta += 1;
+      }
+    });
+    const etiquetas = turnos.map(t => 'Turno ' + t);
+    const valores = turnos.map(t => resumen[t].cuenta > 0 ? (resumen[t].suma / resumen[t].cuenta).toFixed(1) : 0);
+    const colores = valores.map(v => parseFloat(v) < 90 ? '#dc3545' : '#198754');
+
+    if(chartTurnos) chartTurnos.destroy();
+    const ctx = document.getElementById('graficaTurnos');
+    if (!ctx) return;
+    chartTurnos = new Chart(ctx.getContext('2d'), {
+      type: 'bar',
+      data: { labels: etiquetas, datasets: [{ label: 'Promedio %', data: valores, backgroundColor: colores }] },
+      options: { responsive: true, scales: { y: { beginAtZero: true, max: 110 } }, plugins: { datalabels: { anchor: 'end', align: 'top', formatter: v => v + '%', font: { weight: 'bold' } } } }
+    });
+  }
+
+  function dibujarGraficaTendencia(datos) {
+    const valTerritorio = (document.getElementById('filtroTerritorio') || {}).value || 'ALL';
+    
+    const fechasSet = new Set();
+    datos.forEach(d => fechasSet.add(d.fecha));
+    const etiquetas = Array.from(fechasSet).sort();
+    
+    let datasets = [];
+    
+    if (valTerritorio !== 'ALL') {
+      const resumen = {};
+      datos.forEach(d => {
+        if(!resumen[d.fecha]) resumen[d.fecha] = { suma: 0, cuenta: 0 };
+        resumen[d.fecha].suma += d.cumplimiento;
+        resumen[d.fecha].cuenta += 1;
+      });
+      const valores = etiquetas.map(f => resumen[f] ? (resumen[f].suma / resumen[f].cuenta).toFixed(1) : null);
+      datasets.push({
+        label: valTerritorio + ' %',
+        data: valores,
+        borderColor: '#198754',
+        backgroundColor: '#198754',
+        tension: 0.2,
+        fill: false,
+        spanGaps: true,
+        marker: true
+      });
+    } else {
+      const resumenTerr = {};
+      const terLista = window.territoriosLista && window.territoriosLista.length > 0 ? window.territoriosLista : [
+        'Cope y Descope', 'Báscula', 'Mantenimiento', 'Cuarto Frío', 'Conductores',
+        'Oficinas', 'Almacén', 'Área de Calidad', 'Parqueadero', 'Patio de Maniobras',
+        'Producción', 'Envasado', 'Logística Inversa', 'Recepción', 'Despachos'
+      ];
+      terLista.forEach(t => { resumenTerr[t] = {}; });
+      
+      datos.forEach(d => {
+        if(!resumenTerr[d.territorio]) resumenTerr[d.territorio] = {};
+        if(!resumenTerr[d.territorio][d.fecha]) resumenTerr[d.territorio][d.fecha] = { suma: 0, cuenta: 0 };
+        resumenTerr[d.territorio][d.fecha].suma += d.cumplimiento;
+        resumenTerr[d.territorio][d.fecha].cuenta += 1;
+      });
+      
+      const coloresPred = ['#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997', '#0dcaf0', '#0d6efd', '#6610f2', '#6f42c1', '#d63384', '#adb5bd', '#333333', '#17a2b8', '#ff851b', '#39cccc'];
+      
+      let idx = 0;
+      Object.keys(resumenTerr).forEach(t => {
+        const valores = etiquetas.map(f => resumenTerr[t][f] ? (resumenTerr[t][f].suma / resumenTerr[t][f].cuenta).toFixed(1) : null);
+        if (valores.some(v => v !== null)) {
+          datasets.push({
+            label: t,
+            data: valores,
+            borderColor: coloresPred[idx % coloresPred.length],
+            backgroundColor: coloresPred[idx % coloresPred.length],
+            borderWidth: 2,
+            tension: 0.2,
+            fill: false,
+            spanGaps: true
+          });
+          idx++;
+        }
+      });
+    }
+
+    if(chartTend) chartTend.destroy();
+    const ctx = document.getElementById('graficaTendencia').getContext('2d');
+    chartTend = new Chart(ctx, {
+      type: 'line',
+      data: { labels: etiquetas, datasets: datasets },
+      options: { 
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true, max: 110 } }, 
+        plugins: { 
+          datalabels: { 
+            display: valTerritorio !== 'ALL', 
+            anchor: 'end', align: 'top', 
+            formatter: v => v ? v + '%' : '', 
+            font: { weight: 'bold', size: 10 } 
+          },
+          legend: {
+            display: true,
+            position: 'bottom',
+            labels: { boxWidth: 12, font: {size: 10} }
+          }
+        } 
+      }
+    });
+  }
+
+  function dibujarGraficaAuditores(datos) {
+    const resumen = {};
+    datos.forEach(d => {
+      if(!resumen[d.auditor]) resumen[d.auditor] = { suma: 0, cuenta: 0 };
+      resumen[d.auditor].suma += d.cumplimiento;
+      resumen[d.auditor].cuenta += 1;
+    });
+
+    let ranking = Object.keys(resumen).map(auditor => {
+      return { nombre: auditor, promedio: (resumen[auditor].suma / resumen[auditor].cuenta).toFixed(1) };
+    });
+    ranking.sort((a, b) => b.promedio - a.promedio);
+
+    const etiquetas = ranking.map(r => r.nombre);
+    const valores = ranking.map(r => r.promedio);
+    const colores = valores.map(v => parseFloat(v) < 90 ? '#dc3545' : '#198754');
+
+    if(chartAud) chartAud.destroy();
+    const ctx = document.getElementById('graficaAuditores').getContext('2d');
+    chartAud = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: etiquetas, datasets: [{ label: 'Promedio %', data: valores, backgroundColor: colores }] },
+      options: { indexAxis: 'y', responsive: true, scales: { x: { beginAtZero: true, max: 110 } }, plugins: { datalabels: { anchor: 'end', align: 'right', formatter: v => v + '%', font: { weight: 'bold' } } } }
+    });
+  }
+
+  function dibujarGraficaHallazgos(datos) {
+    const contenedor = document.getElementById('contenedor-tabla-hallazgos');
+    const badge = document.getElementById('badge-total-hallazgos');
+    const subtitulo = document.getElementById('subtitulo-hallazgos');
+    if (!contenedor) return;
+
+    // Obtener los datos del día seleccionado o día hábil más reciente
+    const valDia = (document.getElementById('fechaFiltro') || {}).value || '';
+    let datosDia = datos;
+    let fechaMostrar = valDia;
+
+    if (!valDia) {
+      // Buscar día hábil más reciente (lunes a viernes) que tenga datos
+      const fechas = [...new Set(datos.map(d => d.fecha))].filter(Boolean).sort((a, b) => b.localeCompare(a));
+      for (let f of fechas) {
+        let dObj = new Date(f + 'T00:00:00');
+        let diaSem = dObj.getDay();
+        if (diaSem >= 1 && diaSem <= 5) { // Lunes a Viernes
+          fechaMostrar = f;
+          break;
+        }
+      }
+      if (!fechaMostrar && fechas.length > 0) fechaMostrar = fechas[0];
+      if (fechaMostrar) {
+        datosDia = datos.filter(d => d.fecha === fechaMostrar);
+      }
+    }
+
+    if (subtitulo) {
+      subtitulo.textContent = fechaMostrar 
+        ? 'Todos los incumplimientos ("No") registrados en el día ' + fechaMostrar
+        : 'Todos los incumplimientos ("No") en el periodo seleccionado';
+    }
+
+    // Extraer cada hallazgo puntual
+    const hallazgos = [];
+    datosDia.forEach(d => {
+      if (Array.isArray(d.fallos)) {
+        d.fallos.forEach((fallo, idx) => {
+          if (fallo === 1) {
+            const preg = preguntasGlobales[idx] || ('Pregunta #' + (idx + 1));
+            hallazgos.push({
+              territorio: d.territorio,
+              turno: d.turno || '—',
+              fecha: d.fecha || '—',
+              auditor: d.auditor || '—',
+              pregunta: preg,
+              indice: idx + 1
+            });
+          }
+        });
+      }
+    });
+
+    if (badge) badge.textContent = hallazgos.length + ' Hallazgos';
+
+    if (hallazgos.length === 0) {
+      contenedor.innerHTML = '<div style="padding:24px; text-align:center; color:var(--verde); font-weight:700; font-size:13.5px;">'
+        + '✅ ¡Excelente! No se registraron hallazgos ni incumplimientos en este día.</div>';
+      return;
+    }
+
+    let html = '<table style="width:100%; min-width:600px; border-collapse:collapse; font-size:12.5px;">';
+    html += '<thead style="background:var(--gris-bg); border-bottom:2px solid var(--gris-borde); text-align:left;">';
+    html += '<tr>';
+    html += '<th style="padding:10px 12px; font-weight:800; color:var(--texto);">📍 Territorio</th>';
+    html += '<th style="padding:10px 12px; font-weight:800; color:var(--texto); width:80px; text-align:center;">Turno</th>';
+    html += '<th style="padding:10px 12px; font-weight:800; color:var(--texto); width:100px;">Fecha</th>';
+    html += '<th style="padding:10px 12px; font-weight:800; color:var(--texto);">Auditor</th>';
+    html += '<th style="padding:10px 12px; font-weight:800; color:var(--texto);">Pregunta / Incumplimiento ("No")</th>';
+    html += '<th style="padding:10px 12px; font-weight:800; color:var(--texto); width:90px; text-align:center;">Estado</th>';
+    html += '</tr>';
+    html += '</thead>';
+    html += '<tbody>';
+
+    // Sincronizar datos de Baúl si aún no están en memoria
+    if ((!window.datosBaulGlobal || window.datosBaulGlobal.length === 0) && typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.datos) {
+          window.datosBaulGlobal = res.datos;
+          dibujarGraficaHallazgos(datos);
+        }
+      }).obtenerDatosBaul5S();
+    }
+
+    hallazgos.forEach((h, i) => {
+      let bgFila = (i % 2 === 0) ? '#ffffff' : 'rgba(248,250,252,0.7)';
+
+      // Buscar si este hallazgo tiene una acción en Baul_5S y su estado real
+      let itemBaul = null;
+      if (Array.isArray(window.datosBaulGlobal) && window.datosBaulGlobal.length > 0) {
+        itemBaul = window.datosBaulGlobal.find(b => {
+          let mismoTerr = (b.territorio || '').trim().toLowerCase() === (h.territorio || '').trim().toLowerCase();
+          if (!mismoTerr) return false;
+          let descB = (b.descripcion || '').toLowerCase();
+          let pregH = (h.pregunta || '').toLowerCase().trim();
+          let pregCorta = pregH.replace(/^#\d+\s*/, '').substring(0, 30);
+          return descB.includes(pregCorta) || pregH.includes(descB.substring(0, 30));
+        });
+      }
+
+      let estadoTexto = 'Pendiente';
+      let estiloPill = 'background:#fee2e2; color:#991b1b; border:1px solid #fecaca;';
+
+      if (itemBaul) {
+        let est = (itemBaul.estado || '').toUpperCase();
+        if (est === 'CERRADAS' || est.includes('CERRAD')) {
+          estadoTexto = 'Acción Cerrada';
+          estiloPill = 'background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;';
+        } else if (est.includes('PENDIENTE') || est.includes('GESTIONAD') || est.includes('VALIDA') || est.includes('CIERRE')) {
+          estadoTexto = 'En Gestión';
+          estiloPill = 'background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;';
+        } else if (itemBaul.comentario && itemBaul.comentario.trim() !== '') {
+          estadoTexto = 'En Gestión';
+          estiloPill = 'background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;';
+        } else {
+          estadoTexto = 'Abierta';
+          estiloPill = 'background:#fef3c7; color:#b45309; border:1px solid #fde68a;';
+        }
+      }
+
+      html += `<tr style="border-bottom:1px solid var(--gris-borde); background:${bgFila};">`;
+      html += `<td style="padding:9px 12px; font-weight:700; color:var(--texto);">${h.territorio}</td>`;
+      html += `<td style="padding:9px 12px; text-align:center;"><span style="background:rgba(59,130,246,0.1); color:#1d4ed8; padding:3px 8px; border-radius:4px; font-weight:800; font-size:11px;">Turno ${h.turno}</span></td>`;
+      html += `<td style="padding:9px 12px; color:var(--texto-muted); font-size:11.5px;">${h.fecha}</td>`;
+      html += `<td style="padding:9px 12px; font-weight:600; color:var(--texto); font-size:11.5px;">${h.auditor}</td>`;
+      html += `<td style="padding:9px 12px; color:#991b1b; font-weight:600; font-size:12px;">❌ #${h.indice} ${h.pregunta}</td>`;
+      html += `<td style="padding:9px 12px; text-align:center;"><span style="${estiloPill} padding:4px 9px; border-radius:4px; font-weight:800; font-size:11px; white-space:nowrap;">${estadoTexto}</span></td>`;
+      html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    contenedor.innerHTML = html;
+  }
+
+  // ── Mapeo y Cálculo Dinámico del Mapa de Territorios ────────────────────────
+  const LISTA_MAPA_TERRITORIOS = [
+    { id: 'bascula',            nombres: ['báscula', 'bascula'] },
+    { id: 'cuartofrio',         nombres: ['cuarto frío', 'cuarto frio'] },
+    { id: 'oficina',            nombres: ['oficina', 'oficinas'] },
+    { id: 'conductores',        nombres: ['sala de conductores', 'conductores'] },
+    { id: 'parkingmontacargas', nombres: ['parking de montacargas', 'parking montacargas', 'parcking de montcargas', 'montacargas'] },
+    { id: 'tallermontacargas',  nombres: ['taller de montacargas', 'taller montacargas', 'taller flt'] },
+    { id: 'copeydescope',       nombres: ['cope y descope', 'copeydescope'] },
+    { id: 'almacent1',          nombres: ['almacén/t1', 'almacen/t1', 'almacén t1', 't1'] },
+    { id: 'almacensq',          nombres: ['almacén de sustancias químicas', 'almacen de sustancias quimicas', 'almacén de sq', 'almacen sq', 'almacén sq'] },
+    { id: 'patiodeenvase',      nombres: ['patio de envase', 'patios de vacíos', 'patio de vacios', 'patiodevacios'] },
+    { id: 'maquila',            nombres: ['maquila'] },
+    { id: 'materiasprimas',     nombres: ['almacén de materias primas', 'almacen de materias primas', 'materias primas', 'mp'] },
+    { id: 'centrodeacopio',     nombres: ['centro de acopio', 'centrodeacopio'] },
+    { id: 'almacenrepuestos',   nombres: ['almacén de repuestos', 'almacen de repuestos', 'repuestos'] },
+    { id: 'reparacionestibas',  nombres: ['reparación de estibas', 'reparacion de estibas', 'reparación de tarimas', 'estibas', 'tarimas'] }
+  ];
+
+  function normalizarClave(txt) {
+    return String(txt || '')
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  function filtrarMapaPorSemana(valor) {
+    const sel = document.getElementById('filtroSemanaMapa');
+    const semanaSel = valor || (sel ? sel.value : 'ALL');
+    let datosMapa = datosGlobales;
+    if (semanaSel && semanaSel !== 'ALL') {
+      datosMapa = datosGlobales.filter(d => d.semana === semanaSel || d.semanaBase === semanaSel);
+    }
+    actualizarMapaTerritorios(datosMapa);
+  }
+
+  function extraerDriveId(url) {
+    if (!url || typeof url !== 'string') return '';
+    var match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/i) ||
+                url.match(/[?&]id=([a-zA-Z0-9_-]+)/i) ||
+                url.match(/\/d\/([a-zA-Z0-9_-]+)/i);
+    if (match && match[1]) return match[1];
+    if (/^[a-zA-Z0-9_-]{25,}$/.test(url.trim())) return url.trim();
+    return '';
+  }
+
+  function formatearUrlImagen(url) {
+    if (!url || typeof url !== 'string') return '';
+    url = url.trim();
+    if (!url) return '';
+    if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+    var fid = extraerDriveId(url);
+    if (fid) {
+      return 'https://drive.google.com/thumbnail?id=' + fid + '&sz=w300';
+    }
+    return url;
+  }
+
+  function actualizarMapaTerritorios(datos) {
+    const datosUsar = datos || datosGlobales || [];
+    const acumulador = {};
+
+    datosUsar.forEach(d => {
+      const k = normalizarClave(d.territorio);
+      if (!acumulador[k]) acumulador[k] = { suma: 0, cuenta: 0 };
+      let c = Number(d.cumplimiento) || 0;
+      if (c > 0 && c <= 1) c = c * 100;
+      acumulador[k].suma += c;
+      acumulador[k].cuenta++;
+    });
+
+    let totalCumplimiento = 0;
+    let territoriosConDatos = 0;
+    let territorios100 = 0;
+    let territoriosAlerta = 0;
+
+    const areasCatalogo = window.areas5sGlobales || {};
+
+    LISTA_MAPA_TERRITORIOS.forEach(item => {
+      const badgeEl = document.getElementById('map-badge-' + item.id);
+      const duenoEl = document.getElementById('map-dueno-' + item.id);
+      const fotoEl  = document.getElementById('map-foto-' + item.id);
+
+      // Asignar Dueño y Foto desde Areas_5s (Col B y C)
+      let infoArea = null;
+      for (let k in areasCatalogo) {
+        if (item.nombres.some(nom => {
+          const n = normalizarClave(nom);
+          return n === k || k.includes(n) || n.includes(k);
+        })) {
+          infoArea = areasCatalogo[k];
+          break;
+        }
+      }
+
+      if (duenoEl) {
+        duenoEl.textContent = (infoArea && infoArea.dueno) ? infoArea.dueno : 'Sin Asignar';
+      }
+      if (fotoEl) {
+        fotoEl.alt = '';
+        var rawFoto = (infoArea && infoArea.foto) ? String(infoArea.foto).trim() : '';
+        var fid = extraerDriveId(rawFoto);
+        var fUrl = formatearUrlImagen(rawFoto);
+
+        if (fUrl && (fUrl.includes('drive.google.com') || fUrl.startsWith('http') || fUrl.startsWith('data:image') || fid)) {
+          fotoEl.dataset.fileid = fid;
+          fotoEl.dataset.fallback = '0';
+          fotoEl.onerror = function() {
+            var fId = this.dataset.fileid;
+            if (fId && this.dataset.fallback === '0') {
+              this.dataset.fallback = '1';
+              this.src = 'https://lh3.googleusercontent.com/d/' + fId;
+              return;
+            }
+            this.style.display = 'none';
+          };
+          fotoEl.src = fUrl;
+          fotoEl.style.display = 'block';
+        } else {
+          fotoEl.src = '';
+          fotoEl.style.display = 'none';
+        }
+      }
+
+      // Buscar cumplimiento
+      let encontrado = null;
+      for (let nom of item.nombres) {
+        const norm = normalizarClave(nom);
+        if (acumulador[norm] && acumulador[norm].cuenta > 0) {
+          encontrado = acumulador[norm];
+          break;
+        }
+      }
+
+      if (!encontrado) {
+        for (let k in acumulador) {
+          if (item.nombres.some(nom => k.includes(normalizarClave(nom)) || normalizarClave(nom).includes(k))) {
+            if (acumulador[k].cuenta > 0) {
+              encontrado = acumulador[k];
+              break;
+            }
+          }
+        }
+      }
+
+      if (!badgeEl) return;
+
+      if (encontrado && encontrado.cuenta > 0) {
+        let prom = encontrado.suma / encontrado.cuenta;
+        if (prom > 0 && prom <= 1) prom = prom * 100;
+        const pct = prom.toFixed(1);
+        const numPct = parseFloat(pct);
+
+        badgeEl.textContent = pct + ' %';
+        badgeEl.className = 'map-badge ' + (numPct >= 90 ? 'map-badge-verde' : (numPct >= 80 ? 'map-badge-amarillo' : 'map-badge-rojo'));
+
+        totalCumplimiento += numPct;
+        territoriosConDatos++;
+        if (numPct >= 99.9) territorios100++;
+        if (numPct < 80) territoriosAlerta++;
+      } else {
+        badgeEl.textContent = '0.0 %';
+        badgeEl.className = 'map-badge map-badge-rojo';
+        territoriosAlerta++;
+      }
+    });
+
+    // Actualizar KPIs de cabecera en el módulo de Mapa / Modo TV
+    const kpiPromEl = document.getElementById('mapaKpiPromedio');
+    const kpi100El  = document.getElementById('mapaKpi100');
+    const kpiAlertaEl = document.getElementById('mapaKpiAlertas');
+
+    if (kpiPromEl) {
+      const promTotal = territoriosConDatos > 0 ? (totalCumplimiento / territoriosConDatos).toFixed(1) : '0.0';
+      kpiPromEl.textContent = promTotal + '%';
+      kpiPromEl.style.color = (parseFloat(promTotal) >= 90) ? '#10b981' : ((parseFloat(promTotal) >= 80) ? '#f59e0b' : '#ef4444');
+    }
+    if (kpi100El) {
+      kpi100El.textContent = territorios100;
+    }
+    if (kpiAlertaEl) {
+      kpiAlertaEl.textContent = territoriosAlerta;
+    }
+  }
+
+  // ── Controlador de Modo TV (Pantalla Completa Kiosko) ──────────────────────
+  function toggleModoTV() {
+    if (document.body.classList.contains('en-modo-tv')) {
+      salirModoTV();
+    } else {
+      activarModoTV();
+    }
+  }
+
+  function activarModoTV() {
+    document.body.classList.add('en-modo-tv');
+    if (typeof cambiarVista === 'function') {
+      cambiarVista('mapa');
+    }
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    }
+  }
+
+  function salirModoTV() {
+    document.body.classList.remove('en-modo-tv');
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    }
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.body.classList.contains('en-modo-tv')) {
+      salirModoTV();
+    }
+  });
+
+  document.addEventListener('fullscreenchange', function() {
+    if (!document.fullscreenElement && document.body.classList.contains('en-modo-tv')) {
+      document.body.classList.remove('en-modo-tv');
+    }
+  });
+
+  function filtrarDesdeMapa(nombreTerritorio) {
+    const selTerr = document.getElementById('filtroTerritorio');
+    if (!selTerr) return;
+    
+    const norm = normalizarClave(nombreTerritorio);
+    let valorEncontrado = '';
+    for (let opt of selTerr.options) {
+      if (normalizarClave(opt.value) === norm || opt.value.toLowerCase().includes(nombreTerritorio.toLowerCase())) {
+        valorEncontrado = opt.value;
+        break;
+      }
+    }
+
+    if (valorEncontrado) {
+      selTerr.value = (selTerr.value === valorEncontrado) ? 'ALL' : valorEncontrado;
+      actualizarDashboard();
+      if (typeof mostrarToast === 'function') {
+        const msg = selTerr.value === 'ALL' ? 'Mostrando todos los territorios' : 'Filtrando por: ' + valorEncontrado;
+        mostrarToast(msg, 'exito');
+      }
+    }
+  }
+
+  // ── Modo Claro Exclusivo ────────────────────────────────────
+  function toggleTema() {
+    aplicarTema('light');
+  }
+
+  function aplicarTema(tema) {
+    document.documentElement.setAttribute('data-theme', 'light');
+    try {
+      localStorage.removeItem('tema_5s');
+    } catch(e) {}
+  }
+
+  // Inicializar siempre en modo claro
+  window.addEventListener('DOMContentLoaded', function() {
+    aplicarTema('light');
+  });
+
+  function dibujarMatrizTurnos(datos) {
+    // Tomar solo los datos del último día filtrado para ver la evolución diaria
+    const valDia = (document.getElementById('fechaFiltro') || {}).value || '';
+    let datosDia = datos;
+    let fechaMostrar = valDia;
+
+    if (!valDia) {
+      const fechas = [...new Set(datos.map(d => d.fecha))].sort((a, b) => b.localeCompare(a));
+      if (fechas.length === 0) return;
+      fechaMostrar = fechas[0]; // El día más reciente
+      datosDia = datos.filter(d => d.fecha === fechaMostrar);
+    }
+
+    const matriz = {};
+    const terLista = obtenerListaTerritorios();
+    const mapaNormATerr = {};
+
+    terLista.forEach(t => {
+      mapaNormATerr[normalizarClave(t)] = t;
+      matriz[t] = { 'A': [], 'B': [], 'C': [] };
+    });
+
+    // Agrupar calificaciones asociando por territorio canónico
+    datosDia.forEach(d => {
+      const terrCanonical = mapaNormATerr[normalizarClave(d.territorio)] || sanitizarTerritorio(d.territorio);
+      if (terrCanonical && matriz[terrCanonical] && d.turno && matriz[terrCanonical][d.turno]) {
+        matriz[terrCanonical][d.turno].push(d.cumplimiento);
+      }
+    });
+
+    let html = '<table style="width:100%; min-width:620px; border-collapse: collapse; text-align:center; font-size:13px;">';
+    html += '<thead style="background:var(--gris-bg); border-bottom:2px solid var(--gris-borde);">';
+    html += '<tr>';
+    html += '<th style="text-align:left; padding:12px; font-weight:800; color:var(--texto);">📍 Territorio (Día: '+fechaMostrar+')</th>';
+    html += '<th style="padding:12px; font-weight:800; color:var(--texto);">Turno A<br><span style="font-size:10px; opacity:.7;">06:00 - 14:00</span></th>';
+    html += '<th style="padding:12px; font-weight:800; color:var(--texto);">Turno B<br><span style="font-size:10px; opacity:.7;">14:00 - 22:00</span></th>';
+    html += '<th style="padding:12px; font-weight:800; color:var(--texto);">Turno C<br><span style="font-size:10px; opacity:.7;">22:00 - 06:00</span></th>';
+    html += '<th style="padding:12px; font-weight:800; color:var(--texto); background:rgba(0,0,0,0.02); border-left:1px dashed var(--gris-borde);">Promedio Día<br><span style="font-size:10px; opacity:.7;">Cumplimiento</span></th>';
+    html += '</tr>';
+    html += '</thead>';
+    html += '<tbody>';
+
+    const acumTurnos = { 'A': [], 'B': [], 'C': [] };
+
+    terLista.forEach(t => {
+      html += `<tr style="border-bottom:1px solid var(--gris-borde);">`;
+      html += `<td style="text-align:left; padding:10px 12px; font-weight:700; color:var(--texto);">${t}</td>`;
+      
+      const todosValoresTerr = [];
+
+      ['A', 'B', 'C'].forEach(turno => {
+        let valores = matriz[t][turno];
+        if (valores && valores.length > 0) {
+          valores.forEach(v => {
+            acumTurnos[turno].push(v);
+            todosValoresTerr.push(v);
+          });
+          let prom = valores.reduce((a,b)=>a+b,0) / valores.length;
+          let colorBg = prom >= 90 ? '#d1fae5' : (prom >= 80 ? '#fef3c7' : '#fee2e2');
+          let colorTxt = prom >= 90 ? '#065f46' : (prom >= 80 ? '#92400e' : '#991b1b');
+          let icono = prom >= 90 ? '✅' : (prom >= 80 ? '⚠️' : '🚨');
+          html += `<td style="padding:10px;"><span style="background:${colorBg}; color:${colorTxt}; padding:6px 10px; border-radius:6px; font-weight:800; display:inline-block; min-width:65px;">${prom.toFixed(1)}% ${icono}</span></td>`;
+        } else {
+          html += `<td style="padding:10px; color:var(--texto-muted); font-weight:600;">S/D</td>`;
+        }
+      });
+
+      // Columna de Promedio Diario para el Territorio
+      if (todosValoresTerr.length > 0) {
+        let promT = todosValoresTerr.reduce((a,b)=>a+b,0) / todosValoresTerr.length;
+        let colorBg = promT >= 90 ? '#d1fae5' : (promT >= 80 ? '#fef3c7' : '#fee2e2');
+        let colorTxt = promT >= 90 ? '#065f46' : (promT >= 80 ? '#92400e' : '#991b1b');
+        let icono = promT >= 90 ? '✅' : (promT >= 80 ? '⚠️' : '🚨');
+        html += `<td style="padding:10px; background:rgba(0,0,0,0.015); border-left:1px dashed var(--gris-borde);"><span style="background:${colorBg}; color:${colorTxt}; padding:6px 10px; border-radius:6px; font-weight:800; display:inline-block; min-width:65px;">${promT.toFixed(1)}% ${icono}</span></td>`;
+      } else {
+        html += `<td style="padding:10px; background:rgba(0,0,0,0.015); border-left:1px dashed var(--gris-borde); color:var(--texto-muted); font-weight:600;">S/D</td>`;
+      }
+
+      html += '</tr>';
+    });
+    html += '</tbody>';
+
+    // Fila de resumen: Cumplimiento Promedio por Turno y General
+    const todosDiaValores = [...acumTurnos['A'], ...acumTurnos['B'], ...acumTurnos['C']];
+    html += '<tfoot style="background:var(--gris-bg); border-top:2px solid var(--gris-borde); font-weight:800;">';
+    html += '<tr>';
+    html += '<td style="text-align:left; padding:12px; font-weight:800; color:var(--texto);">📊 Promedio General</td>';
+    
+    ['A', 'B', 'C'].forEach(turno => {
+      let valores = acumTurnos[turno];
+      if (valores.length > 0) {
+        let prom = valores.reduce((a,b)=>a+b,0) / valores.length;
+        let colorBg = prom >= 90 ? '#d1fae5' : (prom >= 80 ? '#fef3c7' : '#fee2e2');
+        let colorTxt = prom >= 90 ? '#065f46' : (prom >= 80 ? '#92400e' : '#991b1b');
+        let icono = prom >= 90 ? '✅' : (prom >= 80 ? '⚠️' : '🚨');
+        html += `<td style="padding:10px;"><span style="background:${colorBg}; color:${colorTxt}; padding:6px 10px; border-radius:6px; font-weight:800; display:inline-block; min-width:65px;">${prom.toFixed(1)}% ${icono}</span></td>`;
+      } else {
+        html += `<td style="padding:10px; color:var(--texto-muted); font-weight:600;">S/D</td>`;
+      }
+    });
+
+    if (todosDiaValores.length > 0) {
+      let promTotal = todosDiaValores.reduce((a,b)=>a+b,0) / todosDiaValores.length;
+      let colorBg = promTotal >= 90 ? '#d1fae5' : (promTotal >= 80 ? '#fef3c7' : '#fee2e2');
+      let colorTxt = promTotal >= 90 ? '#065f46' : (promTotal >= 80 ? '#92400e' : '#991b1b');
+      let icono = promTotal >= 90 ? '✅' : (promTotal >= 80 ? '⚠️' : '🚨');
+      html += `<td style="padding:10px; background:rgba(0,0,0,0.03); border-left:1px dashed var(--gris-borde);"><span style="background:${colorBg}; color:${colorTxt}; border:2px solid ${colorTxt}; padding:6px 10px; border-radius:6px; font-weight:900; display:inline-block; min-width:65px;">${promTotal.toFixed(1)}% ${icono}</span></td>`;
+    } else {
+      html += `<td style="padding:10px; background:rgba(0,0,0,0.03); border-left:1px dashed var(--gris-borde); color:var(--texto-muted); font-weight:600;">S/D</td>`;
+    }
+
+    html += '</tr>';
+    html += '</tfoot>';
+    html += '</table>';
+    
+    const divMatriz = document.getElementById('contenedor-matriz-turnos');
+    if (divMatriz) divMatriz.innerHTML = html;
+  }
+
+  async function tomarCapturaMatriz() {
+    const btn = document.getElementById('btn-captura-matriz');
+    const tarjeta = document.getElementById('tarjeta-matriz-turnos');
+    if (!tarjeta) return;
+
+    if (typeof html2canvas === 'undefined') {
+      alert('La herramienta de captura todavía se está inicializando. Intenta de nuevo en unos segundos.');
+      return;
+    }
+
+    const htmlOriginal = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Generando...';
+    }
+
+    try {
+      const canvas = await html2canvas(tarjeta, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        ignoreElements: function(el) {
+          return el.getAttribute('data-html2canvas-ignore') === 'true';
+        }
+      });
+
+      const valDia = (document.getElementById('fechaFiltro') || {}).value || '';
+      const nombreArchivo = 'Matriz_Evolucion_Turnos_' + (valDia || '5S') + '.png';
+
+      const link = document.createElement('a');
+      link.download = nombreArchivo;
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error("Error al capturar matriz:", e);
+      alert("No se pudo generar la captura: " + (e.message || e));
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = htmlOriginal;
+      }
+    }
+  }
+</script>
